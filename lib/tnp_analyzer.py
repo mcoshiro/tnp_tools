@@ -8,8 +8,8 @@ For CMS members, see https://twiki.cern.ch/twiki/bin/view/CMS/ElectronScaleFacto
 
 import json
 import math
-import ROOT
 import os
+import ROOT
 from tnp_utils import *
 
 ROOT.gROOT.LoadMacro('./lib/tnp_utils.cpp')
@@ -18,25 +18,7 @@ ROOT.gROOT.LoadMacro('./lib/tnp_utils.cpp')
 
 class TnpAnalyzer:
   '''
-  Class used to do a T&P analysis. Example usage as follows:
-  
-  #initialize
-  my_tnp_analysis = tnp_analyzer()
-
-  #set input file
-  my_tnp_analysis.set_input_files(['my_file.root'],'tree')
-  
-  #set fitting variable
-  my_tnp_analysis.set_fitting_variable('mll','m_{ll} [GeV]')
-  
-  #add binning
-  my_tnp_analysis.add_nd_binning(
-      [tnp_analyzer.make_nd_bin_dimension('pt','p_{T} [GeV]',[10.0,20.0,35.0,50.0,100.0]),
-      tnp_analyzer.make_nd_bin_dimension('fabs(eta)','|#eta|',[0.0,0.8,1.5,2.0,2.5])]
-      )
-
-  #do interactive run
-  my_tnp_analysis.run_interactive()
+  Class used to do a T&P analysis. See scripts/example.py for example usage.
   '''
 
   def __init__(self, name):
@@ -66,7 +48,6 @@ class TnpAnalyzer:
     self.flag_set_fitting_variable = False
     self.flag_set_measurement_variable = False
     self.flag_set_binning = False
-    self.flag_set_model = False
 
 
   def set_input_files(self, filenames, tree_name):
@@ -162,20 +143,32 @@ class TnpAnalyzer:
       self.bin_names.append(bin_name)
     self.flag_set_binning = True
 
+  def add_custom_binning(self, bin_selections, bin_names):
+    '''
+    Creates custom bins for TnP analysis
+
+    bin_selections  list of strings, describes selection for each bin
+    bin_names       list of strings, names of each bin that appear in plots
+    '''
+    self.nbins = len(bin_selections)
+    self.bin_selections = bin_selections
+    self.bin_names = bin_names
+    self.flag_set_binning
+
   def add_model(self, model_name, model_initializer):
     '''
     Adds an initializer for a RooWorkspace, i.e. signal and background shapes
     with appropriate Parameters. See below for examples of model initializers
     The model must take as an argument the fitting variable (as a RooRealVar)
-    and include RooRealVars nSig and nBkg representing the norm of signal and
-    background as well as a RooRealVar fit_var representing the fit variable
-    and a RooAbsPdf pdf_sb representing the S+B model
+    as well as the bin number and include RooRealVars nSig and nBkg 
+    representing the norm of signal and background as well as a RooRealVar 
+    fit_var representing the fit variable and a RooAbsPdf pdf_sb representing 
+    the S+B model
 
     model_name         string, name for this model
     model_initializer  function that returns RooWorkspace, see examples
     '''
     self.model_initializers[model_name] = model_initializer
-    self.flag_set_model = True
 
   def add_param_initializer(self, name, param_initializer):
     '''
@@ -195,7 +188,7 @@ class TnpAnalyzer:
     '''
     Draws a simple plot for debugging fits
 
-    workspace  T&P workspace
+    workspace  T&P RooWorkspace
     canvas     TCanvas to draw plot on
     '''
     plot = workspace.var('fit_var').frame()
@@ -211,10 +204,41 @@ class TnpAnalyzer:
     plot.Draw()
     canvas.Update()
 
+  def check_initialization(self):
+    #check things that are needed are already set
+    if ((not self.flag_set_input) or
+        (not self.flag_set_fitting_variable) or
+        (not self.flag_set_measurement_variable) or
+        (not self.flag_set_binning):
+      raise ValueError('Must initialize binning, fit variable, measurement, '+
+                       'input files, and model before calling run methods.')
+
+  def initialize_files_directories(self):
+    '''
+    generates output file and directory if they do not already exist
+    '''
+    #make output directory if it doesn't already exist
+    if not os.path.isdir('out'):
+      os.mkdir('out')
+    elif not os.path.isdir('out/'+self.temp_name):
+      print('Output directory not found, making new output directory')
+      os.mkdir('out/'+self.temp_name)
+
+    #open working (swap/temp) file
+    temp_file_name = 'out/'+self.temp_name+'/'+self.temp_name+'.root'
+    if not os.path.isfile(temp_file_name):
+      print('Temp ROOT file not found, making new temp file.')
+      self.temp_file = ROOT.TFile(temp_file_name,'CREATE')
+    else:
+      if self.temp_file == None:
+        self.temp_file = ROOT.TFile(temp_file_name,'UPDATE')
+
   def produce_histograms(self):
     '''
     Processes the input file(s) and generates histograms for use in fitting
     '''
+    self.check_initialization()
+    self.initialize_files_directories()
     print('Preparing file(s) for processing.')
     filenames_vec = ROOT.std.vector('string')()
     for filename in self.input_filenames:
@@ -293,7 +317,7 @@ class TnpAnalyzer:
     #initialize workspace
     fit_var = ROOT.RooRealVar('fit_var', self.fit_var_name, 
                               self.fit_var_range[0], self.fit_var_range[1]) 
-    workspace = self.model_initializers[model](fit_var)
+    workspace = self.model_initializers[model](fit_var, ibin, pass_bool)
     data = ROOT.RooDataHist('data','fit variable', ROOT.RooArgList(fit_var), 
                             self.temp_file.Get(hist_name))
     getattr(workspace,'import')(data)
@@ -341,7 +365,7 @@ class TnpAnalyzer:
         if (user_input[2] == 'False' or user_input[2] == 'false'
             or user_input[2] == 'F' or user_input[2] == 'f'):
           constant_value = False
-        workspace.var(user_input[1]).setConstant()
+        workspace.var(user_input[1]).setConstant(constant_value)
       elif user_input[0]=='set' or user_input[0]=='s':
         if len(user_input)<3:
           print('ERROR: (s)et takes two arguments: set <var> <value>')
@@ -444,6 +468,7 @@ class TnpAnalyzer:
 
     #draw fit to passing leg on middle subpad
     canvas.cd(ibin*3+2)
+    ROOT.gPad.SetMargin(0.1,0.1,0.1,0.1)
     pass_param_dict = dict()
     param_filename = 'out/'+self.temp_name+'/fitinfo_bin'+str(ibin)+'_pass.json'
     hist_name = 'hist_pass_'+self.get_binname(ibin)
@@ -451,7 +476,7 @@ class TnpAnalyzer:
       pass_param_dict = json.loads(input_file.read())
     fit_var_pass = ROOT.RooRealVar('fit_var', self.fit_var_name, 
                               self.fit_var_range[0], self.fit_var_range[1]) 
-    pass_workspace = self.model_initializers[pass_param_dict['fit_model']](fit_var_pass)
+    pass_workspace = self.model_initializers[pass_param_dict['fit_model']](fit_var_pass, ibin, True)
     data_pass = ROOT.RooDataHist('data','fit variable', ROOT.RooArgList(fit_var_pass), 
                             self.temp_file.Get(hist_name))
     getattr(pass_workspace,'import')(data_pass)
@@ -474,6 +499,7 @@ class TnpAnalyzer:
 
     #draw fit to failing leg on right subpad
     canvas.cd(ibin*3+3)
+    ROOT.gPad.SetMargin(0.1,0.1,0.1,0.1)
     fail_param_dict = dict()
     param_filename = 'out/'+self.temp_name+'/fitinfo_bin'+str(ibin)+'_fail.json'
     hist_name = 'hist_fail_'+self.get_binname(ibin)
@@ -481,7 +507,7 @@ class TnpAnalyzer:
       fail_param_dict = json.loads(input_file.read())
     fit_var_fail = ROOT.RooRealVar('fit_var', self.fit_var_name, 
                               self.fit_var_range[0], self.fit_var_range[1]) 
-    fail_workspace = self.model_initializers[fail_param_dict['fit_model']](fit_var_fail)
+    fail_workspace = self.model_initializers[fail_param_dict['fit_model']](fit_var_fail, ibin, False)
     data_fail = ROOT.RooDataHist('data','fit variable', ROOT.RooArgList(fit_var_fail), 
                             self.temp_file.Get(hist_name))
     getattr(fail_workspace,'import')(data_fail)
@@ -517,7 +543,8 @@ class TnpAnalyzer:
       unc = eff*math.hypot(nsig_pass_unc/nsig_pass, nsig_total_unc/nsig_total)
     else:
       print('WARNING: no fit passing signal in bin '+str(ibin))
-    pad_text = ('Fit status pass: {}\n'.format(pass_param_dict['fit_status']))
+    pad_text = self.bin_names[ibin]+'\n'
+    pad_text += ('Fit status pass: {}\n'.format(pass_param_dict['fit_status']))
     pad_text += ('Fit status fail: {}\n'.format(fail_param_dict['fit_status']))
     pad_text += ('Efficiency: {:.4f} #pm {:.4f}\n'.format(eff,unc))
     pad_text += 'Fit parameters:\n'
@@ -564,7 +591,7 @@ class TnpAnalyzer:
     #y_margin = 0.02*(nbins_y*245)
     x_margin = 0.00
     y_margin = 0.00
-    canvas = ROOT.TCanvas('output_canvas','',nbins_x*640,nbins_y*480)
+    canvas = ROOT.TCanvas('output_canvas','',nbins_x*1200,nbins_y*480)
     canvas.Divide(nbins_x*3, nbins_y, x_margin, y_margin)
     effs = []
     for ibin in range(0,self.nbins):
@@ -591,29 +618,8 @@ class TnpAnalyzer:
     Begin interactive run
     '''
 
-    #check things that are needed are already set
-    if ((not self.flag_set_input) or
-        (not self.flag_set_fitting_variable) or
-        (not self.flag_set_measurement_variable) or
-        (not self.flag_set_binning) or
-        (not self.flag_set_model)):
-      raise ValueError('Must initialize binning, fit variable, measurement, '+
-                       'input files, and model before calling run_interactive')
-
-    #make output directory if it doesn't already exist
-    if not os.path.isdir('out'):
-      os.mkdir('out')
-    elif not os.path.isdir('out/'+self.temp_name):
-      print('Output directory not found, making new output directory')
-      os.mkdir('out/'+self.temp_name)
-
-    #open working (swap/temp) file
-    temp_file_name = 'out/'+self.temp_name+'/'+self.temp_name+'.root'
-    if not os.path.isfile(temp_file_name):
-      print('Temp ROOT file not found, making new temp file.')
-      self.temp_file = ROOT.TFile(temp_file_name,'CREATE')
-    else:
-      self.temp_file = ROOT.TFile(temp_file_name,'UPDATE')
+    self.check_initialization()
+    self.initialize_files_directories()
 
     #run main interactive loop
     exit_loop = False

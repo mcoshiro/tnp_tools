@@ -5,9 +5,13 @@ Package containing model initializers that set up fitting models
 
 import ROOT
 
-def model_initializer_dscb_p_cms(fit_var):
+def model_initializer_dscb_p_cms(fit_var, ibin, is_pass):
   '''Model initializer that returns a tnp workspace where the signal model is
   a double sided crystal ball and the background shape is a CMSshape (erf*exp)
+
+  fit_var  RooRealVar representing variable to fit
+  ibin     int, bin number
+  is_pass  bool, if is passing leg
   '''
 
   #set up RooFit stuff
