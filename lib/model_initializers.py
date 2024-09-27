@@ -29,6 +29,14 @@ def model_initializer_dscb_p_cms(fit_var, ibin, is_pass):
   exp_lambda = ROOT.RooRealVar('exp_lambda', 'Nonresonant exponential parameter', 0.0001, 10.0) 
   nSig = ROOT.RooRealVar('nSig', 'Z peak normalization', 0.0, 100000.0) 
   nBkg = ROOT.RooRealVar('nBkg', 'Nonresonant normalization', 0.0, 100000.0) 
+
+  gauss_sigma.setVal(3.0)
+  cb_nl.setVal(3.0)
+  cb_nr.setVal(3.0)
+  cb_alphal.setVal(3.0)
+  cb_alphar.setVal(3.0)
+  nBkg.setVal(5000.0)
+
   getattr(workspace,'import')(gauss_mu)
   getattr(workspace,'import')(gauss_sigma)
   getattr(workspace,'import')(cb_alphal)

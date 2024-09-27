@@ -48,7 +48,7 @@ class TnpAnalyzer:
     self.flag_set_fitting_variable = False
     self.flag_set_measurement_variable = False
     self.flag_set_binning = False
-
+    self.custom_fit_range = None
 
   def set_input_files(self, filenames, tree_name):
     '''
@@ -78,6 +78,14 @@ class TnpAnalyzer:
     self.fit_var_range = var_range
     self.fit_var_weight = weight
     self.flag_set_fitting_variable = True
+
+  def set_custom_fit_range(self, fit_range):
+    '''
+    Sets a custom fit range separate from the measurement variable range
+
+    fit_range  tuple of two floats indicating range
+    '''
+    self.custom_fit_range = fit_range
 
   def set_measurement_variable(self, var):
     '''
@@ -151,9 +159,10 @@ class TnpAnalyzer:
     bin_names       list of strings, names of each bin that appear in plots
     '''
     self.nbins = len(bin_selections)
+    self.nbins_x = 0
     self.bin_selections = bin_selections
     self.bin_names = bin_names
-    self.flag_set_binning
+    self.flag_set_binning = True
 
   def add_model(self, model_name, model_initializer):
     '''
@@ -209,7 +218,7 @@ class TnpAnalyzer:
     if ((not self.flag_set_input) or
         (not self.flag_set_fitting_variable) or
         (not self.flag_set_measurement_variable) or
-        (not self.flag_set_binning):
+        (not self.flag_set_binning)):
       raise ValueError('Must initialize binning, fit variable, measurement, '+
                        'input files, and model before calling run methods.')
 
@@ -254,7 +263,7 @@ class TnpAnalyzer:
       df_bin_pass = df_bin.Filter(self.measurement_variable)
       df_bin_fail = df_bin.Filter('!('+self.measurement_variable+')')
       pass_hist_ptrs.append(df_bin_pass.Histo1D((
-          'hist_pass_'+self.get_binname(ibin),
+          'hist_pass_bin{}'.format(ibin),
           ';'+self.fit_var_desc+';Events/bin',
           self.fit_var_nbins,
           self.fit_var_range[0],
@@ -262,7 +271,7 @@ class TnpAnalyzer:
           'tnpanalysis_fit_var',
           'tnpanalysis_fit_var_weight'))
       fail_hist_ptrs.append(df_bin_fail.Histo1D((
-          'hist_fail_'+self.get_binname(ibin),
+          'hist_fail_bin{}'.format(ibin),
           ';'+self.fit_var_desc+';Events/bin',
           self.fit_var_nbins,
           self.fit_var_range[0],
@@ -309,15 +318,24 @@ class TnpAnalyzer:
       if not param_initializer=='':
         print('ERROR: unknown param initializer, aborting fit.')
         return
-    hist_name = 'hist_'+pass_fail+'_'+self.get_binname(ibin)
+    hist_name = 'hist_'+pass_fail+'_bin{}'.format(ibin)
     if not self.temp_file.GetListOfKeys().Contains(hist_name):
       print('ERROR: Please produce histograms before calling fit.')
       return
 
     #initialize workspace
+    fit_range_lower = self.fit_var_range[0]
+    fit_range_upper = self.fit_var_range[1]
+    if not (self.custom_fit_range == None):
+      fit_range_lower = self.custom_fit_range[0]
+      fit_range_upper = self.custom_fit_range[1]
     fit_var = ROOT.RooRealVar('fit_var', self.fit_var_name, 
-                              self.fit_var_range[0], self.fit_var_range[1]) 
+                              fit_range_lower, fit_upper) 
+    fit_var.setRange(fit_range_lower, fit_range_upper)
+    fit_var.setRange('fitMassRange', fit_range_lower, fit_range_upper)
     workspace = self.model_initializers[model](fit_var, ibin, pass_bool)
+    fit_hist = self.temp_file.Get(hist_name).Clone()
+    zero_outside_range(fit_hist, fit_range_lower, fit_range_upper)
     data = ROOT.RooDataHist('data','fit variable', ROOT.RooArgList(fit_var), 
                             self.temp_file.Get(hist_name))
     getattr(workspace,'import')(data)
@@ -332,6 +350,7 @@ class TnpAnalyzer:
     pdf_sb = workspace.pdf('pdf_sb')
     param_names = workspace_vars_to_list(workspace)
     param_names.remove('fit_var')
+    print('Fitting '+pass_fail+' bin {}'.format(ibin))
     while not exit_loop:
       user_input = input('>:')
       user_input = user_input.split()
@@ -411,7 +430,8 @@ class TnpAnalyzer:
           self.make_simple_tnp_plot(workspace, canvas)
       elif user_input[0]=='fit' or user_input[0]=='f':
         workspace.saveSnapshot('prefit',','.join(param_names))
-        fit_result_ptr = pdf_sb.fitTo(data,ROOT.RooFit.Save(True))
+        fit_result_ptr = pdf_sb.fitTo(data,ROOT.RooFit.Save(True),
+                                      ROOT.RooFit.Range('fitMassRange'))
         fit_status = fit_result_ptr.status()
         ROOT.free_memory_RooFitResult(fit_result_ptr)
         print('Fit status: '+str(fit_status))
@@ -471,7 +491,7 @@ class TnpAnalyzer:
     ROOT.gPad.SetMargin(0.1,0.1,0.1,0.1)
     pass_param_dict = dict()
     param_filename = 'out/'+self.temp_name+'/fitinfo_bin'+str(ibin)+'_pass.json'
-    hist_name = 'hist_pass_'+self.get_binname(ibin)
+    hist_name = 'hist_pass_bin{}'.format(ibin)
     with open(param_filename,'r') as input_file:
       pass_param_dict = json.loads(input_file.read())
     fit_var_pass = ROOT.RooRealVar('fit_var', self.fit_var_name, 
@@ -484,16 +504,19 @@ class TnpAnalyzer:
       if ((not (param_name == 'fit_model' or param_name == 'fit_status')) and
           (not '_unc' in param_name)):
         pass_workspace.var(param_name).setVal(pass_param_dict[param_name])
-    pass_plot = pass_workspace.var('fit_var').frame()
+    pass_plot = pass_workspace.var('fit_var').frame(ROOT.RooFit.Title('Passing leg'))
     pass_workspace.data('data').plotOn(pass_plot)
-    pass_workspace.pdf('pdf_sb').plotOn(pass_plot,ROOT.RooFit.Name('fit_sb'))
     sig_norm_temp = pass_workspace.var('nSig').getValV()
     bak_norm_temp = pass_workspace.var('nBkg').getValV()
     pass_workspace.var('nSig').setVal(0.0)
     pass_workspace.pdf('pdf_sb').plotOn(pass_plot,
         ROOT.RooFit.Normalization(bak_norm_temp/(sig_norm_temp+bak_norm_temp),
-        ROOT.RooAbsReal.Relative),ROOT.RooFit.Name('fit_b'))
+        ROOT.RooAbsReal.Relative),ROOT.RooFit.Name('fit_b'),
+        ROOT.RooFit.LineWidth(1),ROOT.RooFit.LineColor(ROOT.kBlue))
     pass_workspace.var('nSig').setVal(sig_norm_temp)
+    pass_workspace.pdf('pdf_sb').plotOn(pass_plot,ROOT.RooFit.Name('fit_sb'),
+                                        ROOT.RooFit.LineWidth(1),
+                                        ROOT.RooFit.LineColor(ROOT.kRed))
     pass_plot.Draw()
     ROOT.gPad.Update()
 
@@ -502,7 +525,7 @@ class TnpAnalyzer:
     ROOT.gPad.SetMargin(0.1,0.1,0.1,0.1)
     fail_param_dict = dict()
     param_filename = 'out/'+self.temp_name+'/fitinfo_bin'+str(ibin)+'_fail.json'
-    hist_name = 'hist_fail_'+self.get_binname(ibin)
+    hist_name = 'hist_fail_bin{}'.format(ibin)
     with open(param_filename,'r') as input_file:
       fail_param_dict = json.loads(input_file.read())
     fit_var_fail = ROOT.RooRealVar('fit_var', self.fit_var_name, 
@@ -515,16 +538,19 @@ class TnpAnalyzer:
       if ((not (param_name == 'fit_model' or param_name == 'fit_status')) and
           (not '_unc' in param_name)):
         fail_workspace.var(param_name).setVal(fail_param_dict[param_name])
-    fail_plot = fail_workspace.var('fit_var').frame()
+    fail_plot = fail_workspace.var('fit_var').frame(ROOT.RooFit.Title('Failing leg'))
     fail_workspace.data('data').plotOn(fail_plot)
-    fail_workspace.pdf('pdf_sb').plotOn(fail_plot,ROOT.RooFit.Name('fit_sb'))
     sig_norm_temp = fail_workspace.var('nSig').getValV()
     bak_norm_temp = fail_workspace.var('nBkg').getValV()
     fail_workspace.var('nSig').setVal(0.0)
     fail_workspace.pdf('pdf_sb').plotOn(fail_plot,
         ROOT.RooFit.Normalization(bak_norm_temp/(sig_norm_temp+bak_norm_temp),
-        ROOT.RooAbsReal.Relative),ROOT.RooFit.Name('fit_b'))
+        ROOT.RooAbsReal.Relative),ROOT.RooFit.Name('fit_b'),
+        ROOT.RooFit.LineWidth(1),ROOT.RooFit.LineColor(ROOT.kBlue))
     fail_workspace.var('nSig').setVal(sig_norm_temp)
+    fail_workspace.pdf('pdf_sb').plotOn(fail_plot,ROOT.RooFit.Name('fit_sb'),
+                                        ROOT.RooFit.LineWidth(1),
+                                        ROOT.RooFit.LineColor(ROOT.kRed))
     fail_plot.Draw()
     ROOT.gPad.Update()
 
@@ -584,19 +610,59 @@ class TnpAnalyzer:
           return
 
     #draw final plots and calculate final efficiencies
-    #each pass/fail/parameters pad is 426 x 240, with 1.02 x padding 435 x 245
-    nbins_x = self.nbins_x
+    #each pass/fail/parameters pad is 1920x360
+    nbins_y = 10
+    if self.nbins_x != 0:
+      nbins_y = self.nbins_x
     nbins_y = self.nbins//nbins_x
+    if (self.nbins > nbins_x*nbins_y):
+      nbins_x += 1
     #x_margin = 0.02*(nbins_x*435)
     #y_margin = 0.02*(nbins_y*245)
     x_margin = 0.00
     y_margin = 0.00
-    canvas = ROOT.TCanvas('output_canvas','',nbins_x*1200,nbins_y*480)
-    canvas.Divide(nbins_x*3, nbins_y, x_margin, y_margin)
+    canvas = ROOT.TCanvas('output_canvas','',nbins_y*1920,nbins_x*360)
+    canvas.Divide(nbins_y*3, nbins_x, x_margin, y_margin)
     effs = []
     for ibin in range(0,self.nbins):
       effs.append(self.draw_fit_set(ibin,canvas))
     canvas.SaveAs(plot_filename)
+    with open(effi_filename,'w') as output_file:
+      output_file.write(json.dumps(effs))
+    print('Wrote '+effi_filename)
+
+  def generate_cut_and_count_output(self):
+    '''
+    Generates simple output file via cut-and-count method i.e. assuming 100% 
+    of events are signal, as is the case in signal MC
+    '''
+
+    #do checks
+    if not self.temp_file.GetListOfKeys().Contains('hist_pass_bin0'):
+      print('ERROR: Please produce histograms before calling fit.')
+      return
+    effi_filename = 'out/'+self.temp_name+'/cnc_efficiencies.json'
+    if os.path.exists(effi_filename):
+      print('ERROR: output files already exist')
+      return
+
+    #calculate efficiencies
+    effs = []
+    for ibin in range(0,self.nbins):
+      eff = 0.0
+      unc = 1.0
+      npass, npass_unc = get_hist_integral_and_error(
+           self.temp_file.Get('hist_pass_bin{}'.format(ibin)))
+      nfail, nfail_unc = get_hist_integral_and_error(
+           self.temp_file.Get('hist_fail_bin{}'.format(ibin)))
+      ntotal = npass+nfail
+      ntotal_unc = math.hypot(npass_unc, nfail_unc)
+      if (npass > 0.0):
+        eff = npass/ntotal
+        unc = eff*math.hypot(npass_unc/npass, ntotal_unc/ntotal)
+      else:
+        print('WARNING: no passing signal in bin '+str(ibin))
+      effs.append([eff,unc])
     with open(effi_filename,'w') as output_file:
       output_file.write(json.dumps(effs))
     print('Wrote '+effi_filename)
@@ -631,10 +697,11 @@ class TnpAnalyzer:
         continue
       elif (user_input[0] == 'h' or user_input[0] == 'help'):
         print('Available commands:')
+        print('h(elp)                                     print help information')
         print('p(roduce)                                  produce histograms to fit')
         print('f(it) <bin> <pass> <model> [<initializer>] perform interactive fit to histograms')
         print('i(nfo)                                     list info about available bins/models/initializers')
-        print('h(elp)                                     print help information')
+        print('c(utncount)                                generate output based on cut & count')
         print('o(utput)                                   generate final output from fits (not yet implemented)')
         print('q(uit)                                     exit the interactive session')
       elif (user_input[0] == 'p' or user_input[0] == 'produce'):
@@ -651,6 +718,8 @@ class TnpAnalyzer:
           print('ERROR: (f)it requires at least 3 arguments')
       elif (user_input[0] == 'o' or user_input[0] == 'output'):
         self.generate_final_output()
+      elif (user_input[0] == 'c' or user_input[0] == 'cutncount'):
+        self.generate_cut_and_count_output()
       elif (user_input[0] == 'q' or user_input[0] == 'quit'):
         print('Exiting interactive session and saving temp file')
         exit_loop = True
