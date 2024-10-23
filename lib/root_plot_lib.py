@@ -59,14 +59,12 @@ def get_graph_edges(graph):
   @params
   graph - TGraph to check
   '''
-  #supposedly, slicing C pointer will give a Python list
-  graph_n = graph.GetN()
-  graph_x = graph.GetX()[:graph_n]
-  graph_exlo = graph.GetEXlow()[:graph_n]
-  graph_exhi = graph.GetEXhi()[:graph_n]
-  hi_edge = -999999.9
   lo_edge = 999999.9
-  for x, exlo, exhi in zip(graph_x, graph_exlo, graph_exhi):
+  hi_edge = -999999.9
+  for point in range(graph.GetN()):
+    x = graph.GetPointX(point)
+    exlo = graph.GetErrorXlow(point)
+    exhi = graph.GetErrorXhigh(point)
     if (x-exlo)<lo_edge:
       lo_edge = x-exlo
     if (x+exhi)>hi_edge:
@@ -187,7 +185,7 @@ class RplPlot:
     self.n_plots += 1
     return self
 
-  def plot_colormap(hist):
+  def plot_colormap(self,hist):
     '''plots a TH2 as a heatmap
     hist  TH2 to plot
     '''
@@ -440,15 +438,15 @@ class RplPlot:
       leg.Draw('same')
     else:
       ROOT.TGaxis.SetExponentOffset(-0.05,0.0,'y')
-      hist[0].SetTitleSize(0.032,'y')
-      hist[0].GetYaxis().SetTitle(self.y_title)
-      hist[0].GetYaxis().SetNdivisions(606)
-      hist[0].SetTitleSize(0.032,'x')
-      hist[0].GetXaxis().SetTitle(self.x_title)
-      hist[0].GetXaxis().SetNdivisions(606)
-      hist[0].SetTitleSize(0.032,'z')
-      hist[0].GetZaxis().SetTitle(self.z_title)
-      hist[0].Draw('colz')
+      self.hists[0].SetTitleSize(0.032,'y')
+      self.hists[0].GetYaxis().SetTitle(self.y_title)
+      self.hists[0].GetYaxis().SetNdivisions(606)
+      self.hists[0].SetTitleSize(0.032,'x')
+      self.hists[0].GetXaxis().SetTitle(self.x_title)
+      self.hists[0].GetXaxis().SetNdivisions(606)
+      self.hists[0].SetTitleSize(0.032,'z')
+      self.hists[0].GetZaxis().SetTitle(self.z_title)
+      self.hists[0].Draw('colz')
 
     #draw CMS and lumi labels
     label = ROOT.TLatex()

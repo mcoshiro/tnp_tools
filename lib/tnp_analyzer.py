@@ -330,7 +330,7 @@ class TnpAnalyzer:
       fit_range_lower = self.custom_fit_range[0]
       fit_range_upper = self.custom_fit_range[1]
     fit_var = ROOT.RooRealVar('fit_var', self.fit_var_name, 
-                              fit_range_lower, fit_upper) 
+                              fit_range_lower, fit_range_upper) 
     fit_var.setRange(fit_range_lower, fit_range_upper)
     fit_var.setRange('fitMassRange', fit_range_lower, fit_range_upper)
     workspace = self.model_initializers[model](fit_var, ibin, pass_bool)
@@ -595,6 +595,7 @@ class TnpAnalyzer:
     Generates plots of all the fits and a text file with the measured efficiencies and uncertainties
     '''
     #do checks
+    self.initialize_files_directories()
     plot_filename = 'out/'+self.temp_name+'/allfits.pdf'
     effi_filename = 'out/'+self.temp_name+'/efficiencies.json'
     if os.path.exists(plot_filename) or os.path.exists(effi_filename):
@@ -611,10 +612,12 @@ class TnpAnalyzer:
 
     #draw final plots and calculate final efficiencies
     #each pass/fail/parameters pad is 1920x360
+    nbins_x = self.nbins_x
     nbins_y = 10
-    if self.nbins_x != 0:
-      nbins_y = self.nbins_x
-    nbins_y = self.nbins//nbins_x
+    if nbins_x != 0:
+      nbins_y = self.nbins//nbins_x
+    else:
+      nbins_x = self.nbins//nbins_y
     if (self.nbins > nbins_x*nbins_y):
       nbins_x += 1
     #x_margin = 0.02*(nbins_x*435)
@@ -638,6 +641,7 @@ class TnpAnalyzer:
     '''
 
     #do checks
+    self.initialize_files_directories()
     if not self.temp_file.GetListOfKeys().Contains('hist_pass_bin0'):
       print('ERROR: Please produce histograms before calling fit.')
       return

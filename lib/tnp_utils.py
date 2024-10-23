@@ -3,6 +3,7 @@ Package containing utilities for tag-and-probe analyses
 """
 
 import array
+import json
 import ROOT
 
 #dictionary for converting between array type codes and ROOT codes
@@ -171,7 +172,7 @@ def get_hist_integral_and_error(hist):
   hist  TH1 to integrate
   '''
   uncertainty = array.array('d', [0.0])
-  integral = hist.IntegralAndError(0,integral.GetXaxis().GetNbins()+1,uncertainty)
+  integral = hist.IntegralAndError(0,hist.GetXaxis().GetNbins()+1,uncertainty)
   return (integral, uncertainty[0])
 
 def get_bin(value, bin_edges):
