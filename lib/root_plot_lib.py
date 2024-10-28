@@ -373,20 +373,27 @@ class RplPlot:
     can = ROOT.TCanvas('c_'+canvas_name,'c',600,600)
     top_pad = ROOT.TPad('top_pad','',0.0,0.0,1.0,1.0)
     top_pad.SetTicks(1,1)
+    right_margin = 0.06
+    left_margin = 0.14
+    bottom_margin = 0.1
+    top_margin = 0.05
+    if (self.is_2d):
+      right_margin = 0.25
     if (self.plot_bottom):
-      top_pad.SetMargin(0.14,0.06,0.31,0.05)
-    else:
-      top_pad.SetMargin(0.14,0.06,0.1,0.05)
+      bottom_margin = 0.31
+    top_pad.SetMargin(left_margin,right_margin,bottom_margin,top_margin)
     top_pad.SetFillStyle(4000)
     top_pad.SetLogy(self.log_y)
     top_pad.SetLogx(self.log_x)
 
     bot_pad = ROOT.TPad('bot_pad','',0.0,0.0,1.0,1.0)
     bot_pad.SetTicks(1,1)
+    bottom_margin = 0.0
+    top_margin = 1.0
     if (self.plot_bottom):
-      bot_pad.SetMargin(0.14,0.06,0.1,0.71)
-    else:
-      bot_pad.SetMargin(0.14,0.06,0.0,1.0)
+      bottom_margin = 0.1
+      top_margin = 0.71
+    bot_pad.SetMargin(left_margin,right_margin,bottom_margin,top_margin)
     bot_pad.SetFillStyle(4000)
     bot_pad.SetLogy(self.log_y_bottom)
     bot_pad.SetLogx(self.log_x)
@@ -445,6 +452,7 @@ class RplPlot:
       self.hists[0].GetXaxis().SetTitle(self.x_title)
       self.hists[0].GetXaxis().SetNdivisions(606)
       self.hists[0].SetTitleSize(0.032,'z')
+      self.hists[0].SetTitleOffset(2.0,'z')
       self.hists[0].GetZaxis().SetTitle(self.z_title)
       self.hists[0].Draw('colz')
 

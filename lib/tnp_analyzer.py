@@ -11,6 +11,7 @@ import math
 import os
 import ROOT
 from tnp_utils import *
+from merge_pdfs import merge_pdfs
 
 ROOT.gROOT.LoadMacro('./lib/tnp_utils.cpp')
 
@@ -35,6 +36,7 @@ class TnpAnalyzer:
     self.preselection = '1'
     self.preselection_desc = ''
     self.measurement_variable = '1'
+    self.measurement_desc = ''
     self.bin_selections = []
     self.bin_names = []
     self.nbins = 0
@@ -87,14 +89,18 @@ class TnpAnalyzer:
     '''
     self.custom_fit_range = fit_range
 
-  def set_measurement_variable(self, var):
+  def set_measurement_variable(self, var, desc=''):
     '''
     Sets selection efficiency to measure with tag & probe
 
-    var  string, name of branch in TTree or C++ expression
+    var   string, name of branch in TTree or C++ expression
+    desc  string, description of measurement variable
     '''
     self.measurement_variable = var 
     self.flag_set_measurement_variable = True
+    if desc=='':
+      desc = var
+    self.measurement_desc = desc
 
   def set_preselection(self, preselection, desc):
     '''
@@ -229,7 +235,7 @@ class TnpAnalyzer:
     #make output directory if it doesn't already exist
     if not os.path.isdir('out'):
       os.mkdir('out')
-    elif not os.path.isdir('out/'+self.temp_name):
+    if not os.path.isdir('out/'+self.temp_name):
       print('Output directory not found, making new output directory')
       os.mkdir('out/'+self.temp_name)
 
@@ -293,6 +299,8 @@ class TnpAnalyzer:
     param_initializer  string, parameter initializer name
     '''
 
+    self.check_initialization()
+    self.initialize_files_directories()
     #do initial checks
     ibin = 0
     try:
@@ -351,6 +359,16 @@ class TnpAnalyzer:
     param_names = workspace_vars_to_list(workspace)
     param_names.remove('fit_var')
     print('Fitting '+pass_fail+' bin {}'.format(ibin))
+
+    #do one fit before starting interactive session
+    workspace.saveSnapshot('prefit',','.join(param_names))
+    fit_result_ptr = pdf_sb.fitTo(data,ROOT.RooFit.Save(True),
+                                  ROOT.RooFit.Range('fitMassRange'))
+    fit_status = fit_result_ptr.status()
+    ROOT.free_memory_RooFitResult(fit_result_ptr)
+    print('Fit status: '+str(fit_status))
+    self.make_simple_tnp_plot(workspace, canvas)
+
     while not exit_loop:
       user_input = input('>:')
       user_input = user_input.split()
@@ -362,7 +380,9 @@ class TnpAnalyzer:
           print(param_name+': '+str(workspace.var(param_name).getValV()))
         #workspace.Print('v') 
       elif user_input[0]=='help' or user_input[0]=='h':
-        print('This is an interactive fitting session. Commands include:')
+        print('This is an interactive fitting session for bin {} category {}.'
+              .format(ibin_str, pass_probe))
+        print('Commands include:')
         print('f(it)                    attempt a fit')
         print('l(ist)                   display values of variables')
         print('c(onstant) <var> <value> set a value to constant or not')
@@ -471,23 +491,29 @@ class TnpAnalyzer:
             self.fit_histogram(str(ibin+1), pass_probe, model, 
                                param_initializer)
           else:
-            print('Exiting interactive fitter.')
+            if (pass_probe in ['pass','p','P']):
+             self.fit_histogram('0', 'f', model, 
+                                param_initializer)
+            else:
+              print('Exiting interactive fitter.')
         else:
           print('Exiting interactive fitter.')
         exit_loop = True
 
-  def draw_fit_set(self, ibin, canvas):
+  def draw_fit_set(self, ibin, filename):
     '''
     Draws fits and writes fit parameters. Writes to the current gPad (global 
     ROOT pad pointer) and returns a tuple (effificiency, uncertainty) for the
     current bin
 
-    ibin    int, bin to analyze
-    canvas  TCanvas on which to draw plots. Should be divided into ibins*3
+    ibin      int, bin to analyze
+    filename  string, output filename
     '''
 
     #draw fit to passing leg on middle subpad
-    canvas.cd(ibin*3+2)
+    canvas = ROOT.TCanvas('can','can',3*320,320)
+    canvas.Divide(3,1,0.0,0.0)
+    canvas.cd(2)
     ROOT.gPad.SetMargin(0.1,0.1,0.1,0.1)
     pass_param_dict = dict()
     param_filename = 'out/'+self.temp_name+'/fitinfo_bin'+str(ibin)+'_pass.json'
@@ -505,7 +531,7 @@ class TnpAnalyzer:
           (not '_unc' in param_name)):
         pass_workspace.var(param_name).setVal(pass_param_dict[param_name])
     pass_plot = pass_workspace.var('fit_var').frame(ROOT.RooFit.Title('Passing leg'))
-    pass_workspace.data('data').plotOn(pass_plot)
+    pass_workspace.data('data').plotOn(pass_plot, ROOT.RooFit.MarkerStyle(1))
     sig_norm_temp = pass_workspace.var('nSig').getValV()
     bak_norm_temp = pass_workspace.var('nBkg').getValV()
     pass_workspace.var('nSig').setVal(0.0)
@@ -521,7 +547,7 @@ class TnpAnalyzer:
     ROOT.gPad.Update()
 
     #draw fit to failing leg on right subpad
-    canvas.cd(ibin*3+3)
+    canvas.cd(3)
     ROOT.gPad.SetMargin(0.1,0.1,0.1,0.1)
     fail_param_dict = dict()
     param_filename = 'out/'+self.temp_name+'/fitinfo_bin'+str(ibin)+'_fail.json'
@@ -539,7 +565,7 @@ class TnpAnalyzer:
           (not '_unc' in param_name)):
         fail_workspace.var(param_name).setVal(fail_param_dict[param_name])
     fail_plot = fail_workspace.var('fit_var').frame(ROOT.RooFit.Title('Failing leg'))
-    fail_workspace.data('data').plotOn(fail_plot)
+    fail_workspace.data('data').plotOn(fail_plot,ROOT.RooFit.MarkerStyle(1))
     sig_norm_temp = fail_workspace.var('nSig').getValV()
     bak_norm_temp = fail_workspace.var('nBkg').getValV()
     fail_workspace.var('nSig').setVal(0.0)
@@ -555,7 +581,7 @@ class TnpAnalyzer:
     ROOT.gPad.Update()
 
     #write text on left subpad
-    canvas.cd(ibin*3+1)
+    canvas.cd(1)
     nsig_pass = pass_param_dict['nSig']
     nsig_fail = fail_param_dict['nSig']
     nsig_pass_unc = pass_param_dict['nSig_unc']
@@ -587,6 +613,7 @@ class TnpAnalyzer:
     latex = ROOT.TLatex()
     latex.SetTextSize(0.03)
     write_multiline_latex(0.1,0.9,latex,pad_text)
+    canvas.SaveAs(filename)
 
     return (eff, unc)
 
@@ -611,25 +638,18 @@ class TnpAnalyzer:
           return
 
     #draw final plots and calculate final efficiencies
-    #each pass/fail/parameters pad is 1920x360
+    #each pass/fail/parameters pad is 600x200
     nbins_x = self.nbins_x
-    nbins_y = 10
-    if nbins_x != 0:
-      nbins_y = self.nbins//nbins_x
-    else:
-      nbins_x = self.nbins//nbins_y
-    if (self.nbins > nbins_x*nbins_y):
-      nbins_x += 1
-    #x_margin = 0.02*(nbins_x*435)
-    #y_margin = 0.02*(nbins_y*245)
-    x_margin = 0.00
-    y_margin = 0.00
-    canvas = ROOT.TCanvas('output_canvas','',nbins_y*1920,nbins_x*360)
-    canvas.Divide(nbins_y*3, nbins_x, x_margin, y_margin)
+    if nbins_x == 0:
+      nbins_x = 6
     effs = []
+    fragment_names = []
     for ibin in range(0,self.nbins):
-      effs.append(self.draw_fit_set(ibin,canvas))
-    canvas.SaveAs(plot_filename)
+      fragment_name = 'out/'+self.temp_name+'/allfits_fragment'+str(ibin)+'.pdf'
+      fragment_names.append(fragment_name)
+      effs.append(self.draw_fit_set(ibin,fragment_name))
+    fit_plot_name = 'out/'+self.temp_name+'/allfits.pdf'
+    merge_pdfs(fragment_names,nbins_x,fit_plot_name)
     with open(effi_filename,'w') as output_file:
       output_file.write(json.dumps(effs))
     print('Wrote '+effi_filename)

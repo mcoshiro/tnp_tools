@@ -4,6 +4,10 @@ Package containing model initializers that set up fitting models
 """
 
 import ROOT
+import json
+
+MAX_SIGNAL = 100000000.0
+MAX_BACKGROUND = 100000000.0
 
 def model_initializer_dscb_p_cms(fit_var, ibin, is_pass):
   '''Model initializer that returns a tnp workspace where the signal model is
@@ -27,8 +31,8 @@ def model_initializer_dscb_p_cms(fit_var, ibin, is_pass):
   erf_mu = ROOT.RooRealVar('erf_mu', 'Nonresonant (erf) turn-on midpoint', 30.0, 85.0)
   erf_sigma = ROOT.RooRealVar('erf_sigma', 'Nonresonant (erf) turn-on width', 0.001, 2.0) 
   exp_lambda = ROOT.RooRealVar('exp_lambda', 'Nonresonant exponential parameter', 0.0001, 10.0) 
-  nSig = ROOT.RooRealVar('nSig', 'Z peak normalization', 0.0, 100000.0) 
-  nBkg = ROOT.RooRealVar('nBkg', 'Nonresonant normalization', 0.0, 100000.0) 
+  nSig = ROOT.RooRealVar('nSig', 'Z peak normalization', 0.0, MAX_SIGNAL) 
+  nBkg = ROOT.RooRealVar('nBkg', 'Nonresonant normalization', 0.0, MAX_BACKGROUND) 
 
   gauss_sigma.setVal(3.0)
   cb_nl.setVal(3.0)
@@ -56,3 +60,223 @@ def model_initializer_dscb_p_cms(fit_var, ibin, is_pass):
   pdf_sb = ROOT.RooAddPdf('pdf_sb', 'pdf_sb', ROOT.RooArgList(pdf_s, pdf_b), ROOT.RooArgList(nSig, nBkg))
   getattr(workspace,'import')(pdf_sb)
   return workspace
+
+def model_initializer_dscb(fit_var, ibin, is_pass):
+  '''Model initializer that reutrns a tnp workspace where the signal model
+  is a DSCB shape and there is no background
+
+  fit_var      RooRealVar representing variable to fit
+  ibin         int bin number
+  is_pass      bool, indicates if passing or failing leg
+  '''
+  workspace = ROOT.RooWorkspace()
+  getattr(workspace,'import')(fit_var)
+
+  gauss_mu = ROOT.RooRealVar('mean', 'Gaussian mean', 85.0, 95.0) 
+  gauss_sigma = ROOT.RooRealVar('sigma', 'Gaussian sigma', 0.01, 15.0) 
+  cb_alphal = ROOT.RooRealVar('alphal', 'CB left switchover', 0.1, 10.0) 
+  cb_nl = ROOT.RooRealVar('nl', 'CB left power', 0.1, 10.0) 
+  cb_alphar = ROOT.RooRealVar('alphar', 'CB right switchover', 0.1, 10.0) 
+  cb_nr = ROOT.RooRealVar('nr', 'CB right power', 0.1, 10.0) 
+  gauss_sigma.setVal(3.0)
+  cb_alphal.setVal(2.0)
+  cb_alphar.setVal(2.0)
+  cb_nl.setVal(2.0)
+  cb_nr.setVal(2.0)
+
+  nSig = ROOT.RooRealVar('nSig', 'Signal normalization', 0.0, MAX_SIGNAL) 
+  nBkg = ROOT.RooRealVar('nBkg', 'Background normalization', 0.0, 0.0) 
+
+  getattr(workspace,'import')(gauss_mu)
+  getattr(workspace,'import')(gauss_sigma)
+  getattr(workspace,'import')(cb_alphal)
+  getattr(workspace,'import')(cb_nl)
+  getattr(workspace,'import')(cb_alphar)
+  getattr(workspace,'import')(cb_nr)
+  getattr(workspace,'import')(nSig)
+  getattr(workspace,'import')(nBkg)
+
+  pdf_sb  = ROOT.RooCrystalBall('pdf_sb','pdf_sb', fit_var, gauss_mu, gauss_sigma, cb_alphal, cb_nl, cb_alphar, cb_nr)
+  getattr(workspace,'import')(pdf_sb)
+  return workspace
+
+def make_signal_background_model(fit_var, ibin, is_pass, add_signal_model, 
+                                 add_background_model):
+  '''Model initializer that reutrns a tnp workspace with given signal and background 
+  models
+
+  fit_var              RooRealVar representing variable to fit
+  ibin                 int, bin number
+  is_pass              bool, if is passing leg
+  add_signal_model     function that adds signal pdf (pdf_s) to workspace
+  add_background_model function that adds background pdf (pdf_b) to workspace
+  '''
+  workspace = ROOT.RooWorkspace()
+  getattr(workspace,'import')(fit_var)
+
+  nSig = ROOT.RooRealVar('nSig', 'Signal normalization', 0.0, MAX_SIGNAL) 
+  nBkg = ROOT.RooRealVar('nBkg', 'Background normalization', 0.0, MAX_BACKGROUND) 
+  getattr(workspace,'import')(nSig)
+  getattr(workspace,'import')(nBkg)
+  add_signal_model(workspace, ibin, is_pass)
+  add_background_model(workspace, ibin, is_pass)
+
+  pdf_sb = ROOT.RooAddPdf('pdf_sb', 'pdf_sb', 
+      ROOT.RooArgList(workspace.pdf('pdf_s'), workspace.pdf('pdf_b')), 
+      ROOT.RooArgList(nSig, nBkg))
+  getattr(workspace,'import')(pdf_sb)
+  return workspace
+
+def add_signal_model_mcsmear(workspace, ibin, is_pass, get_histogram):
+  '''Adds signal model that is template smeared by a Gaussian
+
+  workspace      workspace to add model to; must have variable fit_var
+  ibin           int, bin number
+  is_pass        bool, if is passing leg
+  get_histogram  function that returns TH1D given ibin and is_pass
+  '''
+
+  fit_var = workspace.var('fit_var')
+  mean = ROOT.RooRealVar('mean', 'Smearing gaussian peak', -5.0, 5.0) 
+  sigma = ROOT.RooRealVar('sigma', 'Smearing gaussian sigma', 0.5, 5.0) 
+  getattr(workspace,'import')(mean)
+  getattr(workspace,'import')(sigma)
+
+  hist = get_histogram(ibin, is_pass)
+  core_hist = ROOT.RooDataHist('pdf_s_core_hist',
+                               'pdf_s_core_hist',
+                               ROOT.RooArgList(fit_var), hist)
+  getattr(workspace,'import')(core_hist)
+  pdf_s_core = ROOT.RooHistPdf('pdf_s_core','pdf_s_core',
+                               ROOT.RooArgSet(fit_var),core_hist)
+  pdf_s_res = ROOT.RooGaussian('pdf_s_res','pdf_s_res',fit_var,mean,sigma)
+  pdf_s = ROOT.RooFFTConvPdf('pdf_s','pdf_s',fit_var,pdf_s_core,pdf_s_res)
+  getattr(workspace,'import')(pdf_s)
+
+def add_signal_model_dscb(workspace, ibin, is_pass):
+  '''Adds double-sided crystal ball distribution as signal model
+
+  workspace    workspace to add model to; must have variable fit_var
+  ibin         int bin number
+  is_pass      bool, indicates if passing or failing leg
+  '''
+  fit_var = workspace.var('fit_var')
+  gauss_mu = ROOT.RooRealVar('mean', 'Gaussian mean', 85.0, 95.0) 
+  gauss_sigma = ROOT.RooRealVar('sigma', 'Gaussian sigma', 0.01, 15.0) 
+  cb_alphal = ROOT.RooRealVar('alphal', 'CB left switchover', 0.1, 10.0) 
+  cb_nl = ROOT.RooRealVar('nl', 'CB left power', 0.1, 10.0) 
+  cb_alphar = ROOT.RooRealVar('alphar', 'CB right switchover', 0.1, 10.0) 
+  cb_nr = ROOT.RooRealVar('nr', 'CB right power', 0.1, 10.0) 
+  gauss_sigma.setVal(3.0)
+  cb_alphal.setVal(2.0)
+  cb_alphar.setVal(2.0)
+  cb_nl.setVal(2.0)
+  cb_nr.setVal(2.0)
+  getattr(workspace,'import')(gauss_mu)
+  getattr(workspace,'import')(gauss_sigma)
+  getattr(workspace,'import')(cb_alphal)
+  getattr(workspace,'import')(cb_nl)
+  getattr(workspace,'import')(cb_alphar)
+  getattr(workspace,'import')(cb_nr)
+  pdf_s  = ROOT.RooCrystalBall('pdf_s','pdf_s', fit_var, gauss_mu, gauss_sigma, cb_alphal, cb_nl, cb_alphar, cb_nr)
+  getattr(workspace,'import')(pdf_s)
+
+def add_background_model_cmsshape(workspace, ibin, is_pass):
+  '''Adds background model that is CMS shape (erf*exp)
+
+  workspace      workspace to add model to; must have variable fit_var
+  ibin           int, bin number
+  is_pass        bool, if is passing leg
+  '''
+  fit_var = workspace.var('fit_var')
+  acms = ROOT.RooRealVar('acms', 'erf turn-on point', 50.0, 80.0)
+  beta = ROOT.RooRealVar('beta', 'erf width', 0.01, 0.08)
+  gamma = ROOT.RooRealVar('gamma', 'exp parameter', -2.0, 2.0)
+  peak = ROOT.RooRealVar('peak', 'peak', 90.0, 90.0)
+  acms.setVal(60.0)
+  beta.setVal(0.01)
+  gamma.setVal(0.005)
+  getattr(workspace,'import')(acms)
+  getattr(workspace,'import')(beta)
+  getattr(workspace,'import')(gamma)
+  getattr(workspace,'import')(peak)
+  pdf_b = ROOT.RooGenericPdf('pdf_b','pdf_b',
+      'TMath::Erfc((@1-@0)*@2)*exp((@4-@0)*@3)',
+      ROOT.RooArgList(fit_var, acms, beta, gamma, peak))
+  getattr(workspace,'import')(pdf_b)
+
+def add_background_model_chebyshev(workspace, ibin, is_pass):
+  '''Adds Chebyshev polynomial of degree 3 as background model
+
+  workspace    workspace to add model to; must have variable fit_var
+  ibin         int bin number
+  is_pass      bool, indicates if passing or failing leg
+  '''
+  fit_var = workspace.var('fit_var')
+  a0 = ROOT.RooRealVar('a0', '0th Chebyshev coefficient', -1.0, 1.0)
+  a1 = ROOT.RooRealVar('a1', '1st Chebyshev coefficient', -1.0, 1.0)
+  a2 = ROOT.RooRealVar('a2', '2nd Chebyshev coefficient', -1.0, 1.0)
+  getattr(workspace,'import')(a0)
+  getattr(workspace,'import')(a1)
+  getattr(workspace,'import')(a2)
+  #pdf_b = ROOT.RooChebyshev('pdf_b', 'pdf_b', fit_var, ROOT.RooArgList(a0, a1, a2))
+  pdf_b = ROOT.RooGenericPdf('pdf_b','pdf_b',
+                             '1+@1*@0+@2*(2*@0*@0-1)+@3*(4*@0*@0*@0-3*@0)',
+                             ROOT.RooArgList(fit_var, a0, a1, a2))
+  getattr(workspace,'import')(pdf_b)
+
+def add_background_model_bernstein(workspace, ibin, is_pass):
+  '''Adds Bernstein polynomial of degree 3 as background model
+
+  workspace    workspace to add model to; must have variable fit_var
+  ibin         int bin number
+  is_pass      bool, indicates if passing or failing leg
+  '''
+  fit_var = workspace.var('fit_var')
+  a0 = ROOT.RooRealVar('a0', '0th Bernstein coefficient', 0.0, 1.0)
+  a1 = ROOT.RooRealVar('a1', '1st Bernstein coefficient', 0.0, 1.0)
+  a2 = ROOT.RooRealVar('a2', '2nd Bernstein coefficient', 0.0, 1.0)
+  a3 = ROOT.RooRealVar('a3', '2nd Bernstein coefficient', 0.0, 1.0)
+  a0.setVal(0.8)
+  a1.setVal(0.7)
+  a2.setVal(0.3)
+  a3.setVal(0.1)
+  getattr(workspace,'import')(a0)
+  getattr(workspace,'import')(a1)
+  getattr(workspace,'import')(a2)
+  getattr(workspace,'import')(a3)
+  pdf_b = ROOT.RooBernstein('pdf_b', 'pdf_b', fit_var, ROOT.RooArgList(a0, a1, a2, a3))
+  getattr(workspace,'import')(pdf_b)
+
+def add_background_model_exponential(workspace, ibin, is_pass):
+  '''Adds exponential as background model
+
+  workspace    workspace to add model to; must have variable fit_var
+  ibin         int bin number
+  is_pass      bool, indicates if passing or failing leg
+  '''
+  fit_var = workspace.var('fit_var')
+  alpha = ROOT.RooRealVar('alpha', 'exponential parameter', -5.0, 5.0)
+  getattr(workspace,'import')(alpha)
+  pdf_b = ROOT.RooExponential('pdf_b', 'pdf_b', fit_var, alpha)
+  getattr(workspace,'import')(pdf_b)
+
+def add_background_model_gamma(workspace, ibin, is_pass):
+  '''Adds gamma distribution as background model
+
+  workspace    workspace to add model to; must have variable fit_var
+  ibin         int bin number
+  is_pass      bool, indicates if passing or failing leg
+  '''
+  fit_var = workspace.var('fit_var')
+  gamma = ROOT.RooRealVar('gamma', 'RooGamma gamma', 0.01, 20.0)
+  beta = ROOT.RooRealVar('beta', 'RooGamma beta', 0.1, 20.0)
+  mu = ROOT.RooRealVar('mu', 'RooGamma mu', 0.0, 60.0)
+  gamma.setVal(4.0)
+  beta.setVal(1.5)
+  mu.setVal(50.0)
+  getattr(workspace,'import')(gamma)
+  getattr(workspace,'import')(beta)
+  getattr(workspace,'import')(mu)
+  pdf_b = ROOT.RooGamma('pdf_b', 'pdf_b', fit_var, a0, a1, a2)
+  getattr(workspace,'import')(pdf_b)

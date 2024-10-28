@@ -18,6 +18,15 @@ ARRAY_TO_ROOT_TYPE = {'b' : 'B',
                       'f' : 'F',
                       'd' : 'D'}
 
+LUMI_TAGS = {'2016APV' : [(20,13)],
+             '2016' : [(17,13)],
+             '2017' : [(41,13)],
+             '2018' : [(60,13)],
+             '2022' : [(8,13.6)],
+             '2022EE' : [(27,13.6)],
+             '2023' : [(18,13.6)],
+             '2023BPix' : [(10,13.6)]}
+
 CMS_COLORS = [ROOT.TColor.GetColor('#3f90da'), 
               ROOT.TColor.GetColor('#ffa90e'),
               ROOT.TColor.GetColor('#bd1f01'), 

@@ -12,6 +12,7 @@ data_filenames = ['/data2/oshiro/ntuples/2016APV/Run2016B_L1matched.root',
 mc_filenames = ['/data2/oshiro/ntuples/2016APV/DY_NLO_L1matched.root']
 mcalt_filenames = ['/data2/oshiro/ntuples/2016APV/DY_LO_L1matched.root']
 measurement_cut = 'fabs(el_dz)<1.0&&fabs(el_dxy)<0.5&&passingMVA94XwpLooseisoV2'
+measurement_desc = 'H#rightarrow Z#gamma electron ID'
 preselection = 'tag_Ele_pt>40&&tag_Ele_abseta<2.17&&(tag_Ele_q+el_q)==0'
 
 elid_analyzer = RmsSFAnalyzer('hzg_elid_2016')

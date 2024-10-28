@@ -5,25 +5,54 @@ T&P meta analyzer that follows standard EGM procedures to generate scale factors
 
 from array import array
 from correctionlib import schemav2 
+from functools import partial
 import os
 import ROOT
 import statistics
 import json
 
 from tnp_analyzer import *
-from tnp_utils import CMS_COLORS
+from tnp_utils import CMS_COLORS, LUMI_TAGS
 from model_initializers import *
-from rms_sf_models import *
 from root_plot_lib import RplPlot
 
-LUMI_TAGS = {'2016APV' : [(20,13)],
-             '2016' : [(17,13)],
-             '2017' : [(41,13)],
-             '2018' : [(60,13)],
-             '2022' : [(8,13.6)],
-             '2022EE' : [(27,13.6)],
-             '2023' : [(18,13.6)],
-             '2023BPix' : [(10,13.6)]}
+def param_initializer_dscb_from_mc(ibin, is_pass, workspace, mc_analyzer):
+  '''
+  Parameter initializer for cheby_dscb model that fixes DSCB parameters except
+  mean and sigma to MC result
+  
+  ibin         int, bin number
+  is_pass      bool, indicates if passing leg
+  workspace    RooWorkspace for this bin
+  mc_analyzer  TnpAnalyzer for MC samples
+  '''
+  pass_fail = 'pass'
+  if not is_pass:
+    pass_fail = 'fail'
+  mc_json_filename = 'out/'+mc_analyzer.temp_name+'/fitinfo_bin'+str(ibin)+'_'+pass_fail+'.json'
+  with open(mc_json_filename,'r') as mc_file:
+    param_dict = json.loads(mc_file.read())
+    for var in ['mean','sigma','alphal','nl','alphar','nr']:
+      workspace.var(var).setVal(param_dict[var])
+    for var in ['alphal','nl','alphar','nr']:
+      workspace.var('alphal').setConstant()
+      workspace.var('nl').setConstant()
+      workspace.var('alphar').setConstant()
+      workspace.var('nr').setConstant()
+
+def get_mc_histogram(ibin, is_pass, mc_analyzer, highpt_bins):
+  '''Helper function used to get appropriate TH1D from analyzer
+  '''
+  pass_fail = 'pass'
+  if not is_pass and not (ibin in highpt_bins):
+    pass_fail = 'fail'
+  mc_filename = 'out/'+mc_analyzer.temp_name+'/'+mc_analyzer.temp_name+'.root'
+  hist_name = 'hist_{}_bin{}'.format(pass_fail,ibin)
+  input_file = ROOT.TFile(mc_filename,'READ')
+  hist = input_file.Get(hist_name)
+  hist.SetDirectory(ROOT.nullptr)
+  input_file.Close()
+  return hist
 
 def add_gap_eta_bins(original_bins):
   '''
@@ -48,6 +77,60 @@ def add_gap_eta_bins(original_bins):
   new_bins.insert(pos_gap_location+1,1.4442)
   new_bins[pos_gap_location+2] = 1.566
   return (new_bins, neg_gap_location, pos_gap_location+1)
+
+def calculate_sfs(eff_dat1, eff_dat2, eff_dat3, eff_dat4, 
+                  eff_sim1, eff_sim2, unc_dat1, unc_sim1):
+  '''Calculates scale factors from efficiencies and associated uncertainties 
+  using RMS method
+
+  eff_dat1  data efficiency measurement 1
+  eff_dat2  data efficiency measurement 2
+  eff_dat3  data efficiency measurement 3
+  eff_dat4  data efficiency measurement 4
+  eff_sim1  simulation efficiency measurement 1
+  eff_sim2  simulation efficiency measurement 2
+  unc_dat1  data efficiency 1 uncertainty
+  unc_sim1  simulation efficiency 1 uncertainty
+
+  returns (scale factor for passing events,
+           associated uncertainty,
+           scale factor for failing events,
+           associated uncertainty)
+  '''
+  pass_sf = 1.0
+  pass_unc = 1.0
+  fail_sf = 1.0
+  fail_unc = 1.0
+  if not (eff_sim1<=0.0 or eff_sim2<=0.0):
+    sfp1 = eff_dat1/eff_sim1
+    sfp2 = eff_dat2/eff_sim1
+    sfp3 = eff_dat3/eff_sim1
+    sfp4 = eff_dat4/eff_sim1
+    sfpm = statistics.mean([sfp1,sfp2,sfp3,sfp4])
+    sfprms = math.hypot(sfp1-sfpm,sfp2-sfpm,sfp3-sfpm,sfp4-sfpm)/math.sqrt(3.0)
+    sfpdstat = sfp1*unc_dat1/eff_dat1
+    sfpmstat = sfp1*unc_sim1/eff_sim1
+    sfpmcalt = abs(sfp1-eff_dat1/eff_sim2)
+    pass_sf = sfpm
+    pass_unc = math.hypot(sfprms/math.sqrt(4.0),sfpdstat,max(sfpmstat,sfpmcalt))
+  else:
+    print('WARNING: zero efficiency found')
+
+  if not (eff_sim1>=1.0 or eff_sim2>=1.0):
+    sff1 = (1.0-eff_dat1)/(1.0-eff_sim1)
+    sff2 = (1.0-eff_dat2)/(1.0-eff_sim1)
+    sff3 = (1.0-eff_dat3)/(1.0-eff_sim1)
+    sff4 = (1.0-eff_dat4)/(1.0-eff_sim1)
+    sffm = statistics.mean([sfp1,sfp2,sfp3,sfp4])
+    sffrms = math.hypot(sff1-sffm,sff2-sffm,sff3-sffm,sff4-sffm)/math.sqrt(3.0)
+    sffdstat = sff1*unc_dat1/(1.0-eff_dat1)
+    sffmstat = sff1*unc_sim1/(1.0-eff_sim1)
+    sffmcalt = abs(sff1-(1.0-eff_dat1)/(1.0-eff_sim2))
+    fail_sf = sffm
+    fail_unc = math.hypot(sffrms/math.sqrt(4.0),sffdstat,max(sffmstat,sffmcalt))
+  else:
+    print('WARNING: unity efficiency found')
+  return pass_sf, pass_unc, fail_sf, fail_unc
 
 def make_data_mc_graph(x, ex, data_y, data_ey, sim_y, sim_ey, name, data_names, 
                        mc_names, x_title, y_title, lumi):
@@ -232,18 +315,19 @@ class RmsSFAnalyzer:
     self.mc_nom_tnp_analyzer.set_custom_fit_range(var_range)
     self.mc_alt_tnp_analyzer.set_custom_fit_range(var_range)
 
-  def set_measurement_variable(self, var):
+  def set_measurement_variable(self, var, desc=''):
     '''
     Sets selection efficiency to measure with tag & probe
 
-    var  string, name of branch in TTree or C++ expression
+    var   string, name of branch in TTree or C++ expression
+    desc  string, description o fmeasurement variable
     '''
-    self.data_nom_tnp_analyzer.set_measurement_variable(var)
-    self.data_altsig_tnp_analyzer.set_measurement_variable(var)
-    self.data_altbkg_tnp_analyzer.set_measurement_variable(var)
-    self.data_altsigbkg_tnp_analyzer.set_measurement_variable(var)
-    self.mc_nom_tnp_analyzer.set_measurement_variable(var)
-    self.mc_alt_tnp_analyzer.set_measurement_variable(var)
+    self.data_nom_tnp_analyzer.set_measurement_variable(var,desc)
+    self.data_altsig_tnp_analyzer.set_measurement_variable(var,desc)
+    self.data_altbkg_tnp_analyzer.set_measurement_variable(var,desc)
+    self.data_altsigbkg_tnp_analyzer.set_measurement_variable(var,desc)
+    self.mc_nom_tnp_analyzer.set_measurement_variable(var,desc)
+    self.mc_alt_tnp_analyzer.set_measurement_variable(var,desc)
 
   def set_preselection(self, preselection_data, preselection_mc, desc):
     '''
@@ -343,22 +427,39 @@ class RmsSFAnalyzer:
     '''
     Adds standard models and parameter initializers for fitting
     '''
-    #self.data_nom_tnp_analyzer.add_model('mc_cms',make_model_initializer(
-    #    model_initializer_nom_egm_meta, self.mc_nom_tnp_analyzer, 
-    #    self.highpt_bins))
-    self.data_nom_tnp_analyzer.add_model('mc_bern',make_model_initializer(
-        model_initializer_bern_egm_meta, self.mc_nom_tnp_analyzer, 
-        self.highpt_bins))
-    self.data_altbkg_tnp_analyzer.add_model('mc_gamma',make_model_initializer(
-        model_initializer_gamma_egm_meta, self.mc_nom_tnp_analyzer, 
-        self.highpt_bins))
-    self.data_altsig_tnp_analyzer.add_model('dscb_bern',model_initializer_bern_dscb)
-    self.data_altsigbkg_tnp_analyzer.add_model('dscb_gamma',model_initializer_gamma_dscb)
+    #this makes liberal use of functools.partial in order to 
+    # 1. merge signal and background models
+    # 2. pass meta parameters such as location of MC template histograms
+    self.data_nom_tnp_analyzer.add_model('mc_bern',
+        partial(make_signal_background_model, 
+            add_signal_model = partial(add_signal_model_mcsmear, 
+                get_histogram = partial(get_mc_histogram, 
+                    mc_analyzer = self.mc_nom_tnp_analyzer, 
+                    highpt_bins = self.highpt_bins)),
+            add_background_model = add_background_model_bernstein))
+    self.data_altsig_tnp_analyzer.add_model('dscb_bern',
+        partial(make_signal_background_model, 
+            add_signal_model = add_signal_model_dscb,
+            add_background_model = add_background_model_bernstein))
+    self.data_altbkg_tnp_analyzer.add_model('mc_gamma',
+        partial(make_signal_background_model, 
+            add_signal_model = partial(add_signal_model_mcsmear, 
+                get_histogram = partial(get_mc_histogram, 
+                    mc_analyzer = self.mc_nom_tnp_analyzer, 
+                    highpt_bins = self.highpt_bins)),
+            add_background_model = add_background_model_gamma))
+    self.data_altsigbkg_tnp_analyzer.add_model('dscb_gamma',
+        partial(make_signal_background_model, 
+            add_signal_model = add_signal_model_dscb,
+            add_background_model = add_background_model_gamma))
     self.mc_nom_tnp_analyzer.add_model('dscb',model_initializer_dscb)
+    #similarly set up initializers to load MC constraints
     self.data_altsig_tnp_analyzer.add_param_initializer('dscb_init',
-        make_param_initializer_dscb_from_mc(self.mc_nom_tnp_analyzer))
+        partial(param_initializer_dscb_from_mc,
+                mc_analyzer = self.mc_nom_tnp_analyzer))
     self.data_altsigbkg_tnp_analyzer.add_param_initializer('dscb_init',
-        make_param_initializer_dscb_from_mc(self.mc_nom_tnp_analyzer))
+        partial(param_initializer_dscb_from_mc,
+                mc_analyzer = self.mc_nom_tnp_analyzer))
 
   def produce_histograms(self):
     '''
@@ -383,6 +484,7 @@ class RmsSFAnalyzer:
     os.mkdir('out/'+altsig_name)
     os.mkdir('out/'+altbkg_name)
     os.mkdir('out/'+altsnb_name)
+    self.data_nom_tnp_analyzer.temp_file.Close()
     os.system('cp out/'+nomdat_name+'/'+nomdat_name+'.root '
               +'out/'+altsig_name+'/'+altsig_name+'.root')
     os.system('cp out/'+nomdat_name+'/'+nomdat_name+'.root '
@@ -392,18 +494,15 @@ class RmsSFAnalyzer:
     self.mc_nom_tnp_analyzer.produce_histograms()
     self.mc_alt_tnp_analyzer.produce_histograms()
 
-  def generate_output(self):
+  def generate_individual_outputs(self):
+    '''Generates individual efficiency measurements if they have not already 
+    been generated and checks output files are generated correctly. Returns
+    true if the outputs are generated correctly
     '''
-    Generate final SFs and histograms
-    '''
-
-    #TODO left off, need to add tools for aggregating results, make some instructions for using the interactive fitters, and test
-
-    #do checks, generate individual outputs if not already generated
     if (self.binning_type != 'std_gap'):
       print('ERROR: only standard gap binning currently supported for ',end='')
       print('automatic output formatting')
-      return
+      return False
     nomdat_name = self.name+'_data_nom'
     altsig_name = self.name+'_data_altsig'
     altbkg_name = self.name+'_data_altbkg'
@@ -430,9 +529,23 @@ class RmsSFAnalyzer:
         (not os.path.isfile('out/'+altsim_name+'/cnc_efficiencies.json'))):
       print('ERROR: Could not generate individual outputs, please ensure '+
             'all fits have been performed.')
+      return False
+    return True
+
+  def generate_output(self):
+    '''Generate final SFs and histograms
+    '''
+
+    if not self.generate_individual_outputs():
       return
 
     #get efficiencies from JSON files
+    nomdat_name = self.name+'_data_nom'
+    altsig_name = self.name+'_data_altsig'
+    altbkg_name = self.name+'_data_altbkg'
+    altsnb_name = self.name+'_data_altsigbkg'
+    nomsim_name = self.name+'_mc_nom'
+    altsim_name = self.name+'_mc_alt'
     eff_dat_nom = []
     eff_alt_sig = []
     eff_alt_bkg = []
@@ -480,40 +593,12 @@ class RmsSFAnalyzer:
       
       mc_eff.append(eff_sim1)
       mc_unc.append(max(unc_sim1,abs(eff_sim1-eff_sim2)))
-
-      if (eff_sim1<=0.0 or eff_sim2<=0.0):
-        print('WARNING: Nonpositive efficiency')
-        pass_sf.append(1.0)
-        pass_unc.append(1.0)
-      else:
-        sfp1 = eff_dat1/eff_sim1
-        sfp2 = eff_dat2/eff_sim1
-        sfp3 = eff_dat3/eff_sim1
-        sfp4 = eff_dat4/eff_sim1
-        sfpm = statistics.mean([sfp1,sfp2,sfp3,sfp4])
-        sfprms = math.hypot(sfp1-sfpm,sfp2-sfpm,sfp3-sfpm,sfp4-sfpm)/math.sqrt(3.0)
-        sfpdstat = sfp1*unc_dat1/eff_dat1
-        sfpmstat = sfp1*unc_sim1/eff_sim1
-        sfpmcalt = abs(sfp1-eff_dat1/eff_sim2)
-        pass_sf.append(sfpm)
-        pass_unc.append(math.hypot(sfprms/math.sqrt(4.0),sfpdstat,max(sfpmstat,sfpmcalt)))
-
-      if (eff_sim1>=1.0 or eff_sim2>=1.0):
-        print('WARNING: Unity efficiency')
-        fail_sf.append(1.0)
-        fail_unc.append(1.0)
-      else:
-        sff1 = (1.0-eff_dat1)/(1.0-eff_sim1)
-        sff2 = (1.0-eff_dat2)/(1.0-eff_sim1)
-        sff3 = (1.0-eff_dat3)/(1.0-eff_sim1)
-        sff4 = (1.0-eff_dat4)/(1.0-eff_sim1)
-        sffm = statistics.mean([sfp1,sfp2,sfp3,sfp4])
-        sffrms = math.hypot(sff1-sffm,sff2-sffm,sff3-sffm,sff4-sffm)/math.sqrt(3.0)
-        sffdstat = sff1*unc_dat1/(1.0-eff_dat1)
-        sffmstat = sff1*unc_sim1/(1.0-eff_sim1)
-        sffmcalt = abs(sff1-(1.0-eff_dat1)/(1.0-eff_sim2))
-        fail_sf.append(sffm)
-        fail_unc.append(math.hypot(sffrms/math.sqrt(4.0),sffdstat,max(sffmstat,sffmcalt)))
+      sfs = calculate_sfs(eff_dat1, eff_dat2, eff_dat3, eff_dat4, 
+                          eff_sim1, eff_sim2, unc_dat1, unc_sim1)
+      pass_sf.append(sfs[0])
+      pass_unc.append(sfs[1])
+      fail_sf.append(sfs[2])
+      fail_unc.append(sfs[3])
 
     #organize SFs as they will be saved in the JSON
     gapincl_eta_bins, neg_gap_idx, pos_gap_idx = add_gap_eta_bins(self.eta_bins)
@@ -543,6 +628,10 @@ class RmsSFAnalyzer:
         pass_json_uns.append(pass_unc[tnp_bin])
         fail_json_sfs.append(fail_sf[tnp_bin])
         fail_json_uns.append(fail_unc[tnp_bin])
+
+    if not os.path.isdir('out/'+self.name):
+      print('Output directory not found, making new output directory')
+      os.mkdir('out/'+self.name)
 
     #write JSON
     clib_sfs_pass = schemav2.Correction(
@@ -601,7 +690,7 @@ class RmsSFAnalyzer:
             flow='clamp',
             ),
         )
-    with open('out/'+self.name+'_scalefactors.json','w') as output_file:
+    with open('out/{0}/{0}_scalefactors.json'.format(self.name),'w') as output_file:
       output_file.write(fix_correctionlib_json(
         [clib_sfs_pass.json(exclude_unset=True),
          clib_uns_pass.json(exclude_unset=True),
@@ -755,64 +844,66 @@ class RmsSFAnalyzer:
         sf_gappt_plot_fail_y[ieta].append(fail_sf[tnp_bin])
         sf_gappt_plot_fail_ey[ieta].append(fail_unc[tnp_bin])
 
-    eff_string = 'Efficiency '+self.data_nom_tnp_analyzer.measurement_variable
+    eff_string = 'Efficiency '+self.data_nom_tnp_analyzer.measurement_desc
+    for fit_syst in ['data_nom','data_altsig','data_altbkg','data_altsigbkg','mc_nom']:
+      os.system('cp out/{0}_{1}/allfits.pdf out/{0}/{1}_allfits.pdf'.format(self.name,fit_syst))
     make_data_mc_graph(eta_plot_x, eta_plot_ex, eff_eta_plot_data_y, 
                        eff_eta_plot_data_ey, eff_eta_plot_mc_y, 
                        eff_eta_plot_mc_ey, 
-                       'out/'+self.name+'_eff_etabinned.pdf', 
+                       'out/{0}/{0}_eff_etabinned.pdf'.format(self.name), 
                        eta_plot_data_names, eta_plot_mc_names,
                        '#eta', eff_string, LUMI_TAGS[self.year])
     make_data_mc_graph(pt_plot_x, pt_plot_ex, eff_pt_plot_data_y, 
                        eff_pt_plot_data_ey, eff_pt_plot_mc_y, 
                        eff_pt_plot_mc_ey, 
-                       'out/'+self.name+'_eff_ptbinned.pdf',
+                       'out/{0}/{0}_eff_ptbinned.pdf'.format(self.name),
                        pt_plot_data_names, pt_plot_mc_names,
                        'p_{T} [GeV]', eff_string, LUMI_TAGS[self.year])
     make_data_mc_graph(gappt_plot_x, gappt_plot_ex, eff_gappt_plot_data_y, 
                        eff_gappt_plot_data_ey, eff_gappt_plot_mc_y, 
                        eff_gappt_plot_mc_ey, 
-                       'out/'+self.name+'_eff_gapptbinned.pdf',
+                       'out/{0}/{0}_eff_gapptbinned.pdf'.format(self.name),
                        gappt_plot_data_names, gappt_plot_mc_names,
                        'p_{T} [GeV]', eff_string, LUMI_TAGS[self.year])
     make_heatmap(self.eta_bins, self.pt_bins, eff_pt_plot_data_y, 
-                 'out/'+self.name+'_eff_data.pdf', '#eta', 'p_{T} [GeV]', 
+                 'out/{0}/{0}_eff_data.pdf'.format(self.name), '#eta', 'p_{T} [GeV]', 
                  eff_string, LUMI_TAGS[self.year])
     make_heatmap(self.eta_bins, self.pt_bins, eff_pt_plot_mc_y, 
-                 'out/'+self.name+'_eff_mc.pdf', '#eta', 'p_{T} [GeV]',
+                 'out/{0}/{0}_eff_mc.pdf'.format(self.name), '#eta', 'p_{T} [GeV]',
                  eff_string, LUMI_TAGS[self.year])
     make_sf_graph(eta_plot_x, eta_plot_ex, sf_eta_plot_pass_y, 
                   sf_eta_plot_pass_ey, 
-                  'out/'+self.name+'_sfpass_etabinned.pdf',
+                  'out/{0}/{0}_sfpass_etabinned.pdf'.format(self.name),
                   eta_plot_names, '#eta', 'Pass SF', LUMI_TAGS[self.year])
     make_sf_graph(eta_plot_x, eta_plot_ex, sf_eta_plot_fail_y, 
                   sf_eta_plot_fail_ey, 
-                  'out/'+self.name+'_sffail_etabinned.pdf',
+                  'out/{0}/{0}_sffail_etabinned.pdf'.format(self.name),
                   eta_plot_names, '#eta', 'Fail SF', LUMI_TAGS[self.year])
     make_sf_graph(pt_plot_x, pt_plot_ex, sf_pt_plot_pass_y, sf_pt_plot_pass_ey,
-                  'out/'+self.name+'_sfpass_ptbinned.pdf',
+                  'out/{0}/{0}_sfpass_ptbinned.pdf'.format(self.name),
                   pt_plot_names, 'p_{T} [GeV]', 'Pass SF', LUMI_TAGS[self.year])
     make_sf_graph(pt_plot_x, pt_plot_ex, sf_pt_plot_fail_y, sf_pt_plot_fail_ey, 
-                  'out/'+self.name+'_sffail_ptbinned.pdf',
+                  'out/{0}/{0}_sffail_ptbinned.pdf'.format(self.name),
                   pt_plot_names, 'p_{T} [GeV]', 'Fail SF', LUMI_TAGS[self.year])
     make_sf_graph(gappt_plot_x, gappt_plot_ex, sf_gappt_plot_pass_y, 
                   sf_gappt_plot_pass_ey, 
-                  'out/'+self.name+'_sfpass_gapptbinned.pdf',
+                  'out/{0}/{0}_sfpass_gapptbinned.pdf'.format(self.name),
                   gappt_plot_names, 'p_{T} [GeV]', 'Pass SF', LUMI_TAGS[self.year])
     make_sf_graph(gappt_plot_x, gappt_plot_ex, sf_gappt_plot_fail_y, 
                   sf_gappt_plot_fail_ey, 
-                  'out/'+self.name+'_sffail_gapptbinned.pdf',
+                  'out/{0}/{0}_sffail_gapptbinned.pdf'.format(self.name),
                   gappt_plot_names, 'p_{T} [GeV]', 'Fail SF', LUMI_TAGS[self.year])
     make_heatmap(self.eta_bins, self.pt_bins, sf_pt_plot_pass_y, 
-                 'out/'+self.name+'_sfpass.pdf', '#eta', 'p_{T} [GeV]', 
+                 'out/{0}/{0}_sfpass.pdf'.format(self.name), '#eta', 'p_{T} [GeV]', 
                  eff_string, LUMI_TAGS[self.year])
     make_heatmap(self.eta_bins, self.pt_bins, sf_pt_plot_fail_y, 
-                 'out/'+self.name+'_sffail.pdf', '#eta', 'p_{T} [GeV]',
+                 'out/{0}/{0}_sffail.pdf'.format(self.name), '#eta', 'p_{T} [GeV]',
                  eff_string, LUMI_TAGS[self.year])
     make_heatmap(self.eta_bins, self.pt_bins, sf_pt_plot_pass_ey, 
-                 'out/'+self.name+'_sfpass_unc.pdf', '#eta', 'p_{T} [GeV]',
+                 'out/{0}/{0}_sfpass_unc.pdf'.format(self.name), '#eta', 'p_{T} [GeV]',
                  eff_string, LUMI_TAGS[self.year])
     make_heatmap(self.eta_bins, self.pt_bins, sf_pt_plot_fail_ey, 
-                 'out/'+self.name+'_sffail_unc.pdf', '#eta', 'p_{T} [GeV]',
+                 'out/{0}/{0}_sffail_unc.pdf'.format(self.name), '#eta', 'p_{T} [GeV]',
                  eff_string, LUMI_TAGS[self.year])
 
   def run_interactive(self):
@@ -823,9 +914,12 @@ class RmsSFAnalyzer:
 
     #run main interactive loop
     exit_loop = False
-    print('Welcome to tnp_tools interactive analysis. Type [h]elp for more information.')
+    print('Welcome to rms_analyzer interactive analysis.')
+    print('Type [h]elp for more information.')
+    past_commands = []
     while not exit_loop:
       user_input = input('>:')
+      past_commands.append(user_input)
       user_input = user_input.split()
       if len(user_input)<1:
         continue
@@ -833,32 +927,39 @@ class RmsSFAnalyzer:
         print('Available commands:')
         print('h(elp)                         print help information')
         print('p(roduce)                      produce histograms to fit; run this first')
-        print('f(it) <nom/alts/altb/altsb/mc> run interactive session (nominal/alt signal/')
-        print('                               alt background/alt signal+alt background/')
-        print('                               mc alt signal constraint')
+        print('f(it) <sample> [<bin> <pass>]  run interactive session (sample=nom,alts,')
+        print('                               altb,altsb,mc) use bin and pass(=p/f) to ')
+        print('                               start from a particular bin and category')
         print('o(utput)                       generate final outputs')
         print('q(uit)                         exit')
+        print('(pre)v(ious)                   list previous commands entered')
       elif (user_input[0] == 'p' or user_input[0] == 'produce'):
         self.produce_histograms()
       elif (user_input[0] == 'f' or user_input[0] == 'fit'):
         if (len(user_input)<2):
           print('ERROR: f(it) requires an argument')
+        starting_bin = '0'
+        starting_cat = 'p'
+        if (len(user_input)>=3):
+          starting_bin = user_input[2]
+        if (len(user_input)>=4):
+          starting_cat = user_input[3]
         elif (user_input[1] == 'nom'):
           #avoid accessing the same ROOT file in multiple tnp_analyzers
           if self.mc_nom_tnp_analyzer.temp_file != None:
             self.mc_nom_tnp_analyzer.temp_file.Close()
-          self.data_nom_tnp_analyzer.run_interactive()
+          self.data_nom_tnp_analyzer.fit_histogram(starting_bin,starting_cat,'mc_bern')
         elif (user_input[1] == 'alts' or user_input[1] == 'altsignal'):
-          self.data_altsig_tnp_analyzer.run_interactive()
+          self.data_altsig_tnp_analyzer.fit_histogram(starting_bin,starting_cat,'dscb_bern','dscb_init')
         elif (user_input[1] == 'altb' or user_input[1] == 'altbackground'):
           #avoid accessing the same ROOT file in multiple tnp_analyzers
           if self.mc_nom_tnp_analyzer.temp_file != None:
             self.mc_nom_tnp_analyzer.temp_file.Close()
-          self.data_altbkg_tnp_analyzer.run_interactive()
+          self.data_altbkg_tnp_analyzer.fit_histogram(starting_bin,starting_cat,'mc_gamma')
         elif (user_input[1] == 'altsb' or user_input[1] == 'altsignalbackground'):
-          self.data_altsigbkg_tnp_analyzer.run_interactive()
+          self.data_altsigbkg_tnp_analyzer.fit_histogram(starting_bin,starting_cat,'dscb_gamma','dscb_init')
         elif (user_input[1] == 'mc' or user_input[1] == 'mcalt'):
-          self.mc_nom_tnp_analyzer.run_interactive()
+          self.mc_nom_tnp_analyzer.fit_histogram(starting_bin,starting_cat,'dscb')
         else:
           print('ERROR: unrecognized argument to f(it)')
       elif (user_input[0] == 'o' or user_input[0] == 'output'):
@@ -866,6 +967,9 @@ class RmsSFAnalyzer:
         self.generate_output()
       elif (user_input[0] == 'q' or user_input[0] == 'quit'):
         exit_loop = True
+      elif (user_input[0] == 'v' or user_input[0] == 'previous'):
+        for past_command in past_commands:
+          print(past_command)
       else:
         print('ERROR: unrecognized command')
 
