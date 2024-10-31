@@ -200,7 +200,7 @@ def calculate_sfs(eff_dat1, eff_dat2, eff_dat3, eff_dat4,
   return pass_sf, pass_unc, fail_sf, fail_unc
 
 def make_data_mc_graph(x, ex, data_y, data_ey, sim_y, sim_ey, name, data_names, 
-                       mc_names, x_title, y_title, lumi):
+                       mc_names, x_title, y_title, lumi, log_x=False):
   '''
   Makes a nice plot with multiple graphs overlayed. Each data graph will be
   drawn in solid line while each simulation graph in dotted lines. The number
@@ -218,6 +218,7 @@ def make_data_mc_graph(x, ex, data_y, data_ey, sim_y, sim_ey, name, data_names,
   x_title     X-axis label
   y_title     y-axis label
   lumi        list of tuple of two floats representing lumi and CM energy
+  log_x       bool, if true makes x-axis logarithmic
   '''
   ROOT.gStyle.SetOptStat(0)
   x_vals = array('d',x)
@@ -249,9 +250,11 @@ def make_data_mc_graph(x, ex, data_y, data_ey, sim_y, sim_ey, name, data_names,
     sf_plot.plot_graph(graph, graph.GetLineColor())
   sf_plot.x_title = x_title
   sf_plot.y_title = y_title
+  sf_plot.log_x = log_x
   sf_plot.draw(name)
 
-def make_sf_graph(x, ex, y, ey, name, graph_names, x_title, y_title, lumi):
+def make_sf_graph(x, ex, y, ey, name, graph_names, x_title, y_title, lumi,
+                  log_x=False):
   '''
   Makes a nice plot with multiple graphs overlayed. 
 
@@ -264,6 +267,7 @@ def make_sf_graph(x, ex, y, ey, name, graph_names, x_title, y_title, lumi):
   x_title     X-axis label
   y_title     y-axis label
   lumi        list of tuple of two floats representing lumi and CM energy
+  log_x       boolean, if true sets x-axis to be logarithmic
   '''
   ROOT.gStyle.SetOptStat(0)
   x_vals = array('d',x)
@@ -284,9 +288,10 @@ def make_sf_graph(x, ex, y, ey, name, graph_names, x_title, y_title, lumi):
     sf_plot.plot_graph(graph, graph.GetLineColor())
   sf_plot.x_title = x_title
   sf_plot.y_title = y_title
+  sf_plot.log_x = log_x
   sf_plot.draw(name)
 
-def make_heatmap(x, y, z, name, x_title, y_title, z_title, lumi):
+def make_heatmap(x, y, z, name, x_title, y_title, z_title, lumi, log_x=False, log_y=False):
   '''
   Makes a heatmap (2D histogram/colz)
 
@@ -298,6 +303,8 @@ def make_heatmap(x, y, z, name, x_title, y_title, z_title, lumi):
   y_title     y-axis label
   z_title     z-axis label
   lumi        list of tuple of two floats representing lumi and CM energy
+  log_x       boolean, if true sets x-axis to be logarithmic
+  log_y       boolean, if true sets y-axis to be logarithmic
   '''
   x_bins = array('d',x)
   y_bins = array('d',y)
@@ -309,6 +316,8 @@ def make_heatmap(x, y, z, name, x_title, y_title, z_title, lumi):
   sf_plot = RplPlot()
   sf_plot.lumi_data = lumi
   sf_plot.plot_colormap(hist)
+  sf_plot.log_x = log_x
+  sf_plot.log_y = log_y
   sf_plot.draw(name)
 
 class RmsSFAnalyzer:
@@ -902,7 +911,7 @@ class RmsSFAnalyzer:
 
     for ipt in range(len(self.pt_bins)-1):
       for ieta in range(len(self.eta_bins)-1):
-        tnp_bin = ieta+ipt*len(self.eta_bins)
+        tnp_bin = ieta+ipt*(len(self.eta_bins)-1)
         eff_eta_plot_data_y[ipt].append(data_eff[tnp_bin])
         eff_eta_plot_data_ey[ipt].append(data_unc[tnp_bin])
         eff_eta_plot_mc_y[ipt].append(mc_eff[tnp_bin])
@@ -945,19 +954,19 @@ class RmsSFAnalyzer:
                        eff_pt_plot_mc_ey, 
                        'out/{0}/{0}_eff_ptbinned.pdf'.format(self.name),
                        pt_plot_data_names, pt_plot_mc_names,
-                       'p_{T} [GeV]', eff_string, LUMI_TAGS[self.year])
+                       'p_{T} [GeV]', eff_string, LUMI_TAGS[self.year],True)
     make_data_mc_graph(gappt_plot_x, gappt_plot_ex, eff_gappt_plot_data_y, 
                        eff_gappt_plot_data_ey, eff_gappt_plot_mc_y, 
                        eff_gappt_plot_mc_ey, 
                        'out/{0}/{0}_eff_gapptbinned.pdf'.format(self.name),
                        gappt_plot_data_names, gappt_plot_mc_names,
-                       'p_{T} [GeV]', eff_string, LUMI_TAGS[self.year])
+                       'p_{T} [GeV]', eff_string, LUMI_TAGS[self.year],True)
     make_heatmap(self.eta_bins, self.pt_bins, eff_pt_plot_data_y, 
                  'out/{0}/{0}_eff_data.pdf'.format(self.name), '#eta', 'p_{T} [GeV]', 
-                 eff_string, LUMI_TAGS[self.year])
+                 eff_string, LUMI_TAGS[self.year],False,True)
     make_heatmap(self.eta_bins, self.pt_bins, eff_pt_plot_mc_y, 
                  'out/{0}/{0}_eff_mc.pdf'.format(self.name), '#eta', 'p_{T} [GeV]',
-                 eff_string, LUMI_TAGS[self.year])
+                 eff_string, LUMI_TAGS[self.year],False,True)
     make_sf_graph(eta_plot_x, eta_plot_ex, sf_eta_plot_pass_y, 
                   sf_eta_plot_pass_ey, 
                   'out/{0}/{0}_sfpass_etabinned.pdf'.format(self.name),
@@ -968,30 +977,34 @@ class RmsSFAnalyzer:
                   eta_plot_names, '#eta', 'Fail SF', LUMI_TAGS[self.year])
     make_sf_graph(pt_plot_x, pt_plot_ex, sf_pt_plot_pass_y, sf_pt_plot_pass_ey,
                   'out/{0}/{0}_sfpass_ptbinned.pdf'.format(self.name),
-                  pt_plot_names, 'p_{T} [GeV]', 'Pass SF', LUMI_TAGS[self.year])
+                  pt_plot_names, 'p_{T} [GeV]', 'Pass SF', LUMI_TAGS[self.year],
+                  True)
     make_sf_graph(pt_plot_x, pt_plot_ex, sf_pt_plot_fail_y, sf_pt_plot_fail_ey, 
                   'out/{0}/{0}_sffail_ptbinned.pdf'.format(self.name),
-                  pt_plot_names, 'p_{T} [GeV]', 'Fail SF', LUMI_TAGS[self.year])
+                  pt_plot_names, 'p_{T} [GeV]', 'Fail SF', LUMI_TAGS[self.year],
+                  True)
     make_sf_graph(gappt_plot_x, gappt_plot_ex, sf_gappt_plot_pass_y, 
                   sf_gappt_plot_pass_ey, 
                   'out/{0}/{0}_sfpass_gapptbinned.pdf'.format(self.name),
-                  gappt_plot_names, 'p_{T} [GeV]', 'Pass SF', LUMI_TAGS[self.year])
+                  gappt_plot_names, 'p_{T} [GeV]', 'Pass SF', 
+                  LUMI_TAGS[self.year], True)
     make_sf_graph(gappt_plot_x, gappt_plot_ex, sf_gappt_plot_fail_y, 
                   sf_gappt_plot_fail_ey, 
                   'out/{0}/{0}_sffail_gapptbinned.pdf'.format(self.name),
-                  gappt_plot_names, 'p_{T} [GeV]', 'Fail SF', LUMI_TAGS[self.year])
+                  gappt_plot_names, 'p_{T} [GeV]', 'Fail SF', 
+                  LUMI_TAGS[self.year], True)
     make_heatmap(self.eta_bins, self.pt_bins, sf_pt_plot_pass_y, 
-                 'out/{0}/{0}_sfpass.pdf'.format(self.name), '#eta', 'p_{T} [GeV]', 
-                 eff_string, LUMI_TAGS[self.year])
+                 'out/{0}/{0}_sfpass.pdf'.format(self.name), '#eta', 
+                 'p_{T} [GeV]', eff_string, LUMI_TAGS[self.year], False, True)
     make_heatmap(self.eta_bins, self.pt_bins, sf_pt_plot_fail_y, 
-                 'out/{0}/{0}_sffail.pdf'.format(self.name), '#eta', 'p_{T} [GeV]',
-                 eff_string, LUMI_TAGS[self.year])
+                 'out/{0}/{0}_sffail.pdf'.format(self.name), '#eta', 
+                 'p_{T} [GeV]', eff_string, LUMI_TAGS[self.year], False, True)
     make_heatmap(self.eta_bins, self.pt_bins, sf_pt_plot_pass_ey, 
-                 'out/{0}/{0}_sfpass_unc.pdf'.format(self.name), '#eta', 'p_{T} [GeV]',
-                 eff_string, LUMI_TAGS[self.year])
+                 'out/{0}/{0}_sfpass_unc.pdf'.format(self.name), '#eta', 
+                 'p_{T} [GeV]', eff_string, LUMI_TAGS[self.year], False, True)
     make_heatmap(self.eta_bins, self.pt_bins, sf_pt_plot_fail_ey, 
-                 'out/{0}/{0}_sffail_unc.pdf'.format(self.name), '#eta', 'p_{T} [GeV]',
-                 eff_string, LUMI_TAGS[self.year])
+                 'out/{0}/{0}_sffail_unc.pdf'.format(self.name), '#eta', 
+                 'p_{T} [GeV]', eff_string, LUMI_TAGS[self.year], False, True)
 
   def run_interactive(self):
     '''

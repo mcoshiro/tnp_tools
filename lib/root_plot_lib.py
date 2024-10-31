@@ -414,11 +414,12 @@ class RplPlot:
       leg = ROOT.TLegend(self.legend_xlo,self.legend_ylo,self.legend_xhi,self.legend_yhi)
       leg.SetEntrySeparation(0)
       leg.SetTextSize(0.03)
+      n_columns = self.n_plots//4+1
       if (self.legend_ncolumns > -1):
         leg.SetNColumns(self.legend_ncolumns)
-      else:
-        n_columns = self.n_plots//4+1
-        leg.SetNColumns(n_columns)
+      leg.SetNColumns(n_columns)
+      if (n_columns > 2):
+        leg.SetTextSize(0.015)
       color_index = 0
       for hist, color, style in zip(self.hists, self.hist_color, self.hist_style):
         hist.SetLineWidth(3)
@@ -463,19 +464,28 @@ class RplPlot:
     label.SetNDC(ROOT.kTRUE)
     label.SetTextAlign(11)
     if (self.title_type == 'cms preliminary'):
-      label.DrawLatex(0.15,0.96,'#font[62]{CMS} #scale[0.8]{#font[52]{Preliminary}}')
+      label.DrawLatex(0.15,0.96,
+                      '#font[62]{CMS} #scale[0.8]{#font[52]{Preliminary}}')
     elif (self.title_type == 'cms work in progress'):
-      label.DrawLatex(0.15,0.96,'#font[62]{CMS} #scale[0.8]{#font[52]{Work in Progress}}')
+      label.DrawLatex(0.15,0.96,
+                      '#font[62]{CMS} #scale[0.8]{#font[52]{Work in Progress}}')
     elif (self.title_type == 'cms supplementary'):
-      label.DrawLatex(0.15,0.96,'#font[62]{CMS} #scale[0.8]{#font[52]{Supplementary}}')
+      label.DrawLatex(0.15,0.96,
+                      '#font[62]{CMS} #scale[0.8]{#font[52]{Supplementary}}')
     elif (self.title_type == 'cms simulation'):
-      label.DrawLatex(0.15,0.96,'#font[62]{CMS} #scale[0.8]{#font[52]{Simulation}}')
+      label.DrawLatex(0.15,0.96,
+                      '#font[62]{CMS} #scale[0.8]{#font[52]{Simulation}}')
     elif (self.title_type == 'cms simulation supplementary'):
-      label.DrawLatex(0.15,0.96,'#font[62]{CMS} #scale[0.8]{#font[52]{Simulation Supplementary}}')
+      label.DrawLatex(0.15,0.96,
+                      '#font[62]{CMS} #scale[0.8]{#font[52]{Simulation '
+                      +'Supplementary}}')
     elif (self.title_type == 'cms simulation preliminary'):
-      label.DrawLatex(0.15,0.96,'#font[62]{CMS} #scale[0.8]{#font[52]{Simulation Preliminary}}')
+      label.DrawLatex(0.15,0.96,
+                      '#font[62]{CMS} #scale[0.8]{#font[52]{Simulation '
+                      +'Preliminary}}')
     elif (self.title_type == 'cms private work'):
-      label.DrawLatex(0.15,0.96,'#font[62]{CMS} #scale[0.8]{#font[52]{Private Work}}')
+      label.DrawLatex(0.15,0.96,
+                      '#font[62]{CMS} #scale[0.8]{#font[52]{Private Work}}')
     elif (self.title_type == 'cms'):
       label.DrawLatex(0.15,0.96,'#font[62]{CMS}')
     label.SetTextAlign(31)
@@ -487,7 +497,8 @@ class RplPlot:
         first = False
       else:
         lumi_energy_string += ' + '
-      lumi_energy_string += str(lumi_datum[0])+' fb^{-1} ('+str(lumi_datum[1])+' TeV)'
+      lumi_energy_string += (str(lumi_datum[0])+' fb^{-1} ('+str(lumi_datum[1])
+                             +' TeV)')
     lumi_energy_string += '}'
     if not (self.title_type == 'cms simulation'):
       label.DrawLatex(1.0-right_margin-0.01,0.96,lumi_energy_string)

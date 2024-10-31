@@ -15,19 +15,19 @@ measurement_cut = 'fabs(el_dz)<1.0&&fabs(el_dxy)<0.5&&passingMVA94XwpLooseisoV2'
 measurement_desc = 'H#rightarrow Z#gamma electron ID'
 preselection = 'tag_Ele_pt>40&&tag_Ele_abseta<2.17&&(tag_Ele_q+el_q)==0'
 
-elid_analyzer = RmsSFAnalyzer('hzg_elid_2016')
+elid_analyzer = RmsSFAnalyzer('hzg_elid_2016apv')
 elid_analyzer.year = '2016APV'
 elid_analyzer.set_input_files(data_filenames,mc_filenames,mcalt_filenames,'tnpEleIDs/fitter_tree')
 elid_analyzer.set_fitting_variable('pair_mass','m_{ee} [GeV]')
 elid_analyzer.set_measurement_variable(measurement_cut,measurement_desc)
 elid_analyzer.set_preselection(preselection,preselection,preselection)
-#elid_analyzer.add_standard_gap_binning([7.0,15.0,20.0,35.0,50.0,100.0,500.0],
-#                                       [-2.5,-2.0,-1.5,-0.8,0.0,0.8,1.5,2.0,2.5],
-#                                       [7.0,35.0,500.0],
-#                                       'el_pt','el_sc_eta')
-elid_analyzer.add_standard_gap_binning([20.0,35.0,50.0],
-                                       [-2.5,-1.5,0.0,1.5,2.5],
-                                       [20.0,40.0,50.0],
+elid_analyzer.add_standard_gap_binning([7.0,15.0,20.0,35.0,50.0,100.0,500.0],
+                                       [-2.5,-2.0,-1.5,-0.8,0.0,0.8,1.5,2.0,2.5],
+                                       [7.0,35.0,500.0],
                                        'el_pt','el_sc_eta')
+#elid_analyzer.add_standard_gap_binning([20.0,35.0,50.0],
+#                                       [-2.5,-1.5,0.0,1.5,2.5],
+#                                       [20.0,40.0,50.0],
+#                                       'el_pt','el_sc_eta')
 elid_analyzer.run_interactive()
 

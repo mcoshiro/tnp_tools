@@ -121,7 +121,7 @@ def model_initializer_dscbgaus(fit_var, ibin, is_pass):
   getattr(workspace,'import')(fit_var)
 
   mu = ROOT.RooRealVar('mu', 'Gaussian mean', 85.0, 95.0) 
-  sigma = ROOT.RooRealVar('sigma', 'Gaussian sigma', 0.01, 15.0) 
+  sigma = ROOT.RooRealVar('sigma', 'Gaussian sigma', 0.1, 10.0) 
   cb_alphal = ROOT.RooRealVar('alphal', 'CB left switchover', 0.1, 10.0) 
   cb_nl = ROOT.RooRealVar('nl', 'CB left power', 0.1, 10.0) 
   cb_alphar = ROOT.RooRealVar('alphar', 'CB right switchover', 0.1, 10.0) 
@@ -415,7 +415,7 @@ def add_signal_model_dscbgaus(workspace, ibin, is_pass):
   '''
   fit_var = workspace.var('fit_var')
   mu = ROOT.RooRealVar('mu', 'Gaussian mean', 85.0, 95.0) 
-  sigma = ROOT.RooRealVar('sigma', 'Gaussian sigma', 0.01, 15.0) 
+  sigma = ROOT.RooRealVar('sigma', 'Gaussian sigma', 0.1, 10.0) 
   cb_alphal = ROOT.RooRealVar('alphal', 'CB left switchover', 0.1, 10.0) 
   cb_nl = ROOT.RooRealVar('nl', 'CB left power', 0.1, 10.0) 
   cb_alphar = ROOT.RooRealVar('alphar', 'CB right switchover', 0.1, 10.0) 
@@ -585,7 +585,7 @@ def add_background_model_chebyshev(workspace, ibin, is_pass):
   getattr(workspace,'import')(pdf_b)
 
 def add_background_model_bernstein(workspace, ibin, is_pass):
-  '''Adds Bernstein polynomial of degree 3 as background model
+  '''Adds Bernstein polynomial of degree 4 as background model
 
   workspace    workspace to add model to; must have variable fit_var
   ibin         int bin number
@@ -596,15 +596,18 @@ def add_background_model_bernstein(workspace, ibin, is_pass):
   a1 = ROOT.RooRealVar('a1', '1st Bernstein coefficient', 0.0, 1.0)
   a2 = ROOT.RooRealVar('a2', '2nd Bernstein coefficient', 0.0, 1.0)
   a3 = ROOT.RooRealVar('a3', '2nd Bernstein coefficient', 0.0, 1.0)
+  a4 = ROOT.RooRealVar('a4', '3rd Bernstein coefficient', 0.0, 1.0)
   a0.setVal(0.8)
   a1.setVal(0.7)
   a2.setVal(0.3)
   a3.setVal(0.1)
+  a4.setVal(0.1)
   getattr(workspace,'import')(a0)
   getattr(workspace,'import')(a1)
   getattr(workspace,'import')(a2)
   getattr(workspace,'import')(a3)
-  pdf_b = ROOT.RooBernstein('pdf_b', 'pdf_b', fit_var, ROOT.RooArgList(a0, a1, a2, a3))
+  getattr(workspace,'import')(a4)
+  pdf_b = ROOT.RooBernstein('pdf_b', 'pdf_b', fit_var, ROOT.RooArgList(a0, a1, a2, a3, a4))
   getattr(workspace,'import')(pdf_b)
 
 def add_background_model_exponential(workspace, ibin, is_pass):
@@ -629,10 +632,10 @@ def add_background_model_gamma(workspace, ibin, is_pass):
   '''
   fit_var = workspace.var('fit_var')
   gamma = ROOT.RooRealVar('gamma', 'RooGamma gamma', 0.01, 20.0)
-  beta = ROOT.RooRealVar('beta', 'RooGamma beta', 0.1, 20.0)
+  beta = ROOT.RooRealVar('beta', 'RooGamma beta', 0.1, 100.0)
   gamma_mu = ROOT.RooRealVar('gamma_mu', 'RooGamma mu', 0.0, 60.0)
-  gamma.setVal(4.0)
-  beta.setVal(1.5)
+  gamma.setVal(2.0)
+  beta.setVal(10.0)
   gamma_mu.setVal(50.0)
   getattr(workspace,'import')(gamma)
   getattr(workspace,'import')(beta)
