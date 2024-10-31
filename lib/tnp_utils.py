@@ -2,7 +2,7 @@
 Package containing utilities for tag-and-probe analyses
 """
 
-import array
+from array import array
 import json
 import ROOT
 
@@ -127,7 +127,7 @@ def write_variable_to_root_file(var, var_type, var_name, file):
   if not var_type in ARRAY_TO_ROOT_TYPE:
     raise ValueError('Unsupported variable type to write to ROOT file.')
   dummy_tree = ROOT.TTree('tree','')
-  var_pointer = array.array(var_type, [var])
+  var_pointer = array(var_type, [var])
   dummy_tree.Branch('var',var_pointer,'var/'+ARRAY_TO_ROOT_TYPE[var_type])
   dummy_tree.Fill()
   file.WriteObject(dummy_tree, var_name)
@@ -180,7 +180,7 @@ def get_hist_integral_and_error(hist):
 
   hist  TH1 to integrate
   '''
-  uncertainty = array.array('d', [0.0])
+  uncertainty = array('d', [0.0])
   integral = hist.IntegralAndError(0,hist.GetXaxis().GetNbins()+1,uncertainty)
   return (integral, uncertainty[0])
 

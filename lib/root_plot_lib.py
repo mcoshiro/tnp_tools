@@ -378,7 +378,8 @@ class RplPlot:
     bottom_margin = 0.1
     top_margin = 0.05
     if (self.is_2d):
-      right_margin = 0.25
+      bottom_margin = 0.2
+      right_margin = 0.18
     if (self.plot_bottom):
       bottom_margin = 0.31
     top_pad.SetMargin(left_margin,right_margin,bottom_margin,top_margin)
@@ -489,7 +490,7 @@ class RplPlot:
       lumi_energy_string += str(lumi_datum[0])+' fb^{-1} ('+str(lumi_datum[1])+' TeV)'
     lumi_energy_string += '}'
     if not (self.title_type == 'cms simulation'):
-      label.DrawLatex(0.93,0.96,lumi_energy_string)
+      label.DrawLatex(1.0-right_margin-0.01,0.96,lumi_energy_string)
     top_pad.Modified()
 
     #draw lower plot

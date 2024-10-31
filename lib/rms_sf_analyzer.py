@@ -29,16 +29,83 @@ def param_initializer_dscb_from_mc(ibin, is_pass, workspace, mc_analyzer):
   pass_fail = 'pass'
   if not is_pass:
     pass_fail = 'fail'
-  mc_json_filename = 'out/'+mc_analyzer.temp_name+'/fitinfo_bin'+str(ibin)+'_'+pass_fail+'.json'
+  mc_json_filename = 'out/{}/fitinfo_bin{}_{}.json'.format(
+          mc_analyzer.temp_name,str(ibin),pass_fail)
   with open(mc_json_filename,'r') as mc_file:
     param_dict = json.loads(mc_file.read())
-    for var in ['mean','sigma','alphal','nl','alphar','nr']:
+    for var in ['mean','sigmal','sigmar','alphal','nl','alphar','nr']:
       workspace.var(var).setVal(param_dict[var])
     for var in ['alphal','nl','alphar','nr']:
-      workspace.var('alphal').setConstant()
-      workspace.var('nl').setConstant()
-      workspace.var('alphar').setConstant()
-      workspace.var('nr').setConstant()
+      workspace.var(var).setConstant()
+
+def param_initializer_moddscb_from_mc(ibin, is_pass, workspace, mc_analyzer):
+  '''
+  Parameter initializer for cheby_dscb model that fixes DSCB parameters except
+  mean and sigma to MC result
+  
+  ibin         int, bin number
+  is_pass      bool, indicates if passing leg
+  workspace    RooWorkspace for this bin
+  mc_analyzer  TnpAnalyzer for MC samples
+  '''
+  pass_fail = 'pass'
+  if not is_pass:
+    pass_fail = 'fail'
+  mc_json_filename = 'out/{}/fitinfo_bin{}_{}.json'.format(
+          mc_analyzer.temp_name,str(ibin),pass_fail)
+  with open(mc_json_filename,'r') as mc_file:
+    param_dict = json.loads(mc_file.read())
+    for var in ['mean','sigmal','sigmar','alphal','nl1','nl2','fl','alphar',
+                'nr1','nr2','fr']:
+      workspace.var(var).setVal(param_dict[var])
+    for var in ['alphal','nl1','nl2','fl','alphar','nr1','nr2','fr']:
+      workspace.var(var).setConstant()
+
+def param_initializer_dscbgaus_from_mc(ibin, is_pass, workspace, mc_analyzer):
+  '''
+  Parameter initializer for cheby_dscb model that fixes DSCB parameters except
+  mean and sigma to MC result
+  
+  ibin         int, bin number
+  is_pass      bool, indicates if passing leg
+  workspace    RooWorkspace for this bin
+  mc_analyzer  TnpAnalyzer for MC samples
+  '''
+  pass_fail = 'pass'
+  if not is_pass:
+    pass_fail = 'fail'
+  mc_json_filename = 'out/{}/fitinfo_bin{}_{}.json'.format(
+          mc_analyzer.temp_name,str(ibin),pass_fail)
+  with open(mc_json_filename,'r') as mc_file:
+    param_dict = json.loads(mc_file.read())
+    for var in ['mu','sigma','alphal','nl','alphar','nr','gauss_mu',
+                'gauss_sigma','gauss_frac']:
+      workspace.var(var).setVal(param_dict[var])
+    for var in ['alphal','nl','alphar','nr','gauss_mu','gauss_sigma',
+                'gauss_frac']:
+      workspace.var(var).setConstant()
+
+def param_initializer_cbconvgen_from_mc(ibin, is_pass, workspace, mc_analyzer):
+  '''
+  Parameter initializer for cbconvgen model that fixes CB parameters to MC
+  result
+  
+  ibin         int, bin number
+  is_pass      bool, indicates if passing leg
+  workspace    RooWorkspace for this bin
+  mc_analyzer  TnpAnalyzer for MC samples
+  '''
+  pass_fail = 'pass'
+  if not is_pass:
+    pass_fail = 'fail'
+  mc_json_filename = 'out/{}/fitinfo_bin{}_{}.json'.format(
+          mc_analyzer.temp_name,str(ibin),pass_fail)
+  with open(mc_json_filename,'r') as mc_file:
+    param_dict = json.loads(mc_file.read())
+    for var in ['m0','sigma','alpha','n','sigma_2','tailLeft']:
+      workspace.var(var).setVal(param_dict[var])
+    for var in ['alpha','n','sigma_2','tailLeft']:
+      workspace.var(var).setConstant()
 
 def get_mc_histogram(ibin, is_pass, mc_analyzer, highpt_bins):
   '''Helper function used to get appropriate TH1D from analyzer
@@ -121,7 +188,7 @@ def calculate_sfs(eff_dat1, eff_dat2, eff_dat3, eff_dat4,
     sff2 = (1.0-eff_dat2)/(1.0-eff_sim1)
     sff3 = (1.0-eff_dat3)/(1.0-eff_sim1)
     sff4 = (1.0-eff_dat4)/(1.0-eff_sim1)
-    sffm = statistics.mean([sfp1,sfp2,sfp3,sfp4])
+    sffm = statistics.mean([sff1,sff2,sff3,sff4])
     sffrms = math.hypot(sff1-sffm,sff2-sffm,sff3-sffm,sff4-sffm)/math.sqrt(3.0)
     sffdstat = sff1*unc_dat1/(1.0-eff_dat1)
     sffmstat = sff1*unc_sim1/(1.0-eff_sim1)
@@ -430,36 +497,54 @@ class RmsSFAnalyzer:
     #this makes liberal use of functools.partial in order to 
     # 1. merge signal and background models
     # 2. pass meta parameters such as location of MC template histograms
-    self.data_nom_tnp_analyzer.add_model('mc_bern',
+    nom_signal_model = partial(add_signal_model_mcsmear, 
+        get_histogram = partial(get_mc_histogram, 
+            mc_analyzer = self.mc_nom_tnp_analyzer, 
+            highpt_bins = self.highpt_bins))
+    nom_signal_model_name = 'mc'
+    nom_background_model = add_background_model_bernstein
+    nom_background_model_name = 'bern'
+    alt_signal_model = add_signal_model_dscbgaus
+    alt_signal_model_standalone = model_initializer_dscbgaus
+    alt_signal_model_initializer = partial(param_initializer_dscbgaus_from_mc,
+        mc_analyzer = self.mc_nom_tnp_analyzer)
+    alt_signal_model_name = 'dscbgaus'
+    alt_background_model = add_background_model_gamma
+    alt_background_model_name = 'gamma'
+
+    self.nom_fn_name = '{}_{}'.format(nom_signal_model_name, 
+                                      nom_background_model_name)
+    self.alts_fn_name = '{}_{}'.format(alt_signal_model_name, 
+                                       nom_background_model_name)
+    self.altb_fn_name = '{}_{}'.format(nom_signal_model_name, 
+                                       alt_background_model_name)
+    self.altsb_fn_name = '{}_{}'.format(alt_signal_model_name, 
+                                        alt_background_model_name)
+    self.alts_fn_init = '{}_init'.format(alt_signal_model_name)
+    self.alts_fn_name_sa = alt_signal_model_name
+
+    self.data_nom_tnp_analyzer.add_model(self.nom_fn_name,
         partial(make_signal_background_model, 
-            add_signal_model = partial(add_signal_model_mcsmear, 
-                get_histogram = partial(get_mc_histogram, 
-                    mc_analyzer = self.mc_nom_tnp_analyzer, 
-                    highpt_bins = self.highpt_bins)),
-            add_background_model = add_background_model_bernstein))
-    self.data_altsig_tnp_analyzer.add_model('dscb_bern',
+            add_signal_model = nom_signal_model,
+            add_background_model = nom_background_model))
+    self.data_altsig_tnp_analyzer.add_model(self.alts_fn_name,
         partial(make_signal_background_model, 
-            add_signal_model = add_signal_model_dscb,
-            add_background_model = add_background_model_bernstein))
-    self.data_altbkg_tnp_analyzer.add_model('mc_gamma',
+            add_signal_model = alt_signal_model,
+            add_background_model = nom_background_model))
+    self.data_altbkg_tnp_analyzer.add_model(self.altb_fn_name,
         partial(make_signal_background_model, 
-            add_signal_model = partial(add_signal_model_mcsmear, 
-                get_histogram = partial(get_mc_histogram, 
-                    mc_analyzer = self.mc_nom_tnp_analyzer, 
-                    highpt_bins = self.highpt_bins)),
-            add_background_model = add_background_model_gamma))
-    self.data_altsigbkg_tnp_analyzer.add_model('dscb_gamma',
+            add_signal_model = nom_signal_model,
+            add_background_model = alt_background_model))
+    self.data_altsigbkg_tnp_analyzer.add_model(self.altsb_fn_name,
         partial(make_signal_background_model, 
-            add_signal_model = add_signal_model_dscb,
-            add_background_model = add_background_model_gamma))
-    self.mc_nom_tnp_analyzer.add_model('dscb',model_initializer_dscb)
-    #similarly set up initializers to load MC constraints
-    self.data_altsig_tnp_analyzer.add_param_initializer('dscb_init',
-        partial(param_initializer_dscb_from_mc,
-                mc_analyzer = self.mc_nom_tnp_analyzer))
-    self.data_altsigbkg_tnp_analyzer.add_param_initializer('dscb_init',
-        partial(param_initializer_dscb_from_mc,
-                mc_analyzer = self.mc_nom_tnp_analyzer))
+            add_signal_model = alt_signal_model,
+            add_background_model = alt_background_model))
+    self.mc_nom_tnp_analyzer.add_model(alt_signal_model_name,
+        alt_signal_model_standalone)
+    self.data_altsig_tnp_analyzer.add_param_initializer(self.alts_fn_init,
+        alt_signal_model_initializer)
+    self.data_altsigbkg_tnp_analyzer.add_param_initializer(self.alts_fn_init,
+        alt_signal_model_initializer)
 
   def produce_histograms(self):
     '''
@@ -517,6 +602,8 @@ class RmsSFAnalyzer:
       self.data_altbkg_tnp_analyzer.generate_final_output()
     if not os.path.isfile('out/'+altsnb_name+'/efficiencies.json'):
       self.data_altsigbkg_tnp_analyzer.generate_final_output()
+    if not os.path.isfile('out/'+nomsim_name+'/efficiencies.json'):
+      self.mc_nom_tnp_analyzer.generate_final_output() #just for fit plots
     if not os.path.isfile('out/'+nomsim_name+'/cnc_efficiencies.json'):
       self.mc_nom_tnp_analyzer.generate_cut_and_count_output()
     if not os.path.isfile('out/'+altsim_name+'/cnc_efficiencies.json'):
@@ -944,22 +1031,33 @@ class RmsSFAnalyzer:
           starting_bin = user_input[2]
         if (len(user_input)>=4):
           starting_cat = user_input[3]
-        elif (user_input[1] == 'nom'):
+        if (user_input[1] == 'nom'):
           #avoid accessing the same ROOT file in multiple tnp_analyzers
           if self.mc_nom_tnp_analyzer.temp_file != None:
             self.mc_nom_tnp_analyzer.temp_file.Close()
-          self.data_nom_tnp_analyzer.fit_histogram(starting_bin,starting_cat,'mc_bern')
+          self.data_nom_tnp_analyzer.fit_histogram(starting_bin,starting_cat,
+                                                   self.nom_fn_name)
         elif (user_input[1] == 'alts' or user_input[1] == 'altsignal'):
-          self.data_altsig_tnp_analyzer.fit_histogram(starting_bin,starting_cat,'dscb_bern','dscb_init')
+          self.data_altsig_tnp_analyzer.fit_histogram(starting_bin,
+                                                      starting_cat,
+                                                      self.alts_fn_name,
+                                                      self.alts_fn_init)
         elif (user_input[1] == 'altb' or user_input[1] == 'altbackground'):
           #avoid accessing the same ROOT file in multiple tnp_analyzers
           if self.mc_nom_tnp_analyzer.temp_file != None:
             self.mc_nom_tnp_analyzer.temp_file.Close()
-          self.data_altbkg_tnp_analyzer.fit_histogram(starting_bin,starting_cat,'mc_gamma')
+          self.data_altbkg_tnp_analyzer.fit_histogram(starting_bin,
+                                                      starting_cat,
+                                                      self.altb_fn_name)
         elif (user_input[1] == 'altsb' or user_input[1] == 'altsignalbackground'):
-          self.data_altsigbkg_tnp_analyzer.fit_histogram(starting_bin,starting_cat,'dscb_gamma','dscb_init')
+          self.data_altsigbkg_tnp_analyzer.fit_histogram(starting_bin,
+                                                         starting_cat,
+                                                         self.altsb_fn_name,
+                                                         self.alts_fn_init)
         elif (user_input[1] == 'mc' or user_input[1] == 'mcalt'):
-          self.mc_nom_tnp_analyzer.fit_histogram(starting_bin,starting_cat,'dscb')
+          self.mc_nom_tnp_analyzer.fit_histogram(starting_bin,
+                                                 starting_cat,
+                                                 self.alts_fn_name_sa)
         else:
           print('ERROR: unrecognized argument to f(it)')
       elif (user_input[0] == 'o' or user_input[0] == 'output'):

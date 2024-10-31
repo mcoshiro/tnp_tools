@@ -520,8 +520,15 @@ class TnpAnalyzer:
     hist_name = 'hist_pass_bin{}'.format(ibin)
     with open(param_filename,'r') as input_file:
       pass_param_dict = json.loads(input_file.read())
+
+    #initialize workspace
+    fit_range_lower = self.fit_var_range[0]
+    fit_range_upper = self.fit_var_range[1]
+    if not (self.custom_fit_range == None):
+      fit_range_lower = self.custom_fit_range[0]
+      fit_range_upper = self.custom_fit_range[1]
     fit_var_pass = ROOT.RooRealVar('fit_var', self.fit_var_name, 
-                              self.fit_var_range[0], self.fit_var_range[1]) 
+                              fit_range_lower, fit_range_upper) 
     pass_workspace = self.model_initializers[pass_param_dict['fit_model']](fit_var_pass, ibin, True)
     data_pass = ROOT.RooDataHist('data','fit variable', ROOT.RooArgList(fit_var_pass), 
                             self.temp_file.Get(hist_name))
@@ -555,7 +562,7 @@ class TnpAnalyzer:
     with open(param_filename,'r') as input_file:
       fail_param_dict = json.loads(input_file.read())
     fit_var_fail = ROOT.RooRealVar('fit_var', self.fit_var_name, 
-                              self.fit_var_range[0], self.fit_var_range[1]) 
+                              fit_range_lower, fit_range_upper) 
     fail_workspace = self.model_initializers[fail_param_dict['fit_model']](fit_var_fail, ibin, False)
     data_fail = ROOT.RooDataHist('data','fit variable', ROOT.RooArgList(fit_var_fail), 
                             self.temp_file.Get(hist_name))
