@@ -374,6 +374,88 @@ def add_signal_model_mcsmear(workspace, ibin, is_pass, get_histogram):
   pdf_s = ROOT.RooFFTConvPdf('pdf_s','pdf_s',fit_var,pdf_s_core,pdf_s_res)
   getattr(workspace,'import')(pdf_s)
 
+def add_signal_model_mcsumsmear(workspace, ibin, is_pass, get_histogram):
+  '''Adds signal model that is template formed from sum of passing and
+  failing MC smeared by a Gaussian
+
+  workspace      workspace to add model to; must have variable fit_var
+  ibin           int, bin number
+  is_pass        bool, if is passing leg
+  get_histogram  function that returns TH1D given ibin and is_pass
+  '''
+
+  fit_var = workspace.var('fit_var')
+  mean = ROOT.RooRealVar('mean', 'Smearing gaussian peak', -5.0, 5.0) 
+  sigma = ROOT.RooRealVar('sigma', 'Smearing gaussian sigma', 0.5, 5.0) 
+  pass_frac = ROOT.RooRealVar('pass_frac', 'pass template coef', 0.0, 1.0)
+  if (is_pass):
+    pass_frac.setVal(1.0)
+  else:
+    pass_frac.setVal(0.0)
+  getattr(workspace,'import')(mean)
+  getattr(workspace,'import')(sigma)
+  getattr(workspace,'import')(pass_frac)
+
+  pass_hist = get_histogram(ibin, True)
+  fail_hist = get_histogram(ibin, False)
+  core_hist_pass = ROOT.RooDataHist('core_hist_pass',
+                                    'core_hist_pass',
+                                    ROOT.RooArgList(fit_var), pass_hist)
+  core_hist_fail = ROOT.RooDataHist('core_hist_fail',
+                                    'core_hist_fail',
+                                    ROOT.RooArgList(fit_var), fail_hist)
+  getattr(workspace,'import')(core_hist_pass)
+  getattr(workspace,'import')(core_hist_fail)
+  pdf_s_core_pass = ROOT.RooHistPdf('pdf_s_core_pass','pdf_s_core_pass',
+                                    ROOT.RooArgSet(fit_var),core_hist_pass)
+  pdf_s_core_fail = ROOT.RooHistPdf('pdf_s_core_fail','pdf_s_core_fail',
+                                    ROOT.RooArgSet(fit_var),core_hist_fail)
+  pdf_s_core = ROOT.RooAddPdf('pdf_s_core','pdf_s_core',pdf_s_core_pass,
+                              pdf_s_core_fail,pass_frac)
+  pdf_s_res = ROOT.RooGaussian('pdf_s_res','pdf_s_res',fit_var,mean,sigma)
+  pdf_s = ROOT.RooFFTConvPdf('pdf_s','pdf_s',fit_var,pdf_s_core,pdf_s_res)
+  getattr(workspace,'import')(pdf_s)
+
+def add_signal_model_mcdscbsmear(workspace, ibin, is_pass, get_histogram):
+  '''Adds signal model that is template convoluted with a crystal ball
+
+  workspace      workspace to add model to; must have variable fit_var
+  ibin           int, bin number
+  is_pass        bool, if is passing leg
+  get_histogram  function that returns TH1D given ibin and is_pass
+  '''
+
+  fit_var = workspace.var('fit_var')
+  mu = ROOT.RooRealVar('mu', 'Smearing gaussian peak', -5.0, 5.0) 
+  sigma = ROOT.RooRealVar('sigma', 'Smearing gaussian sigma', 0.5, 5.0) 
+  cb_alphal = ROOT.RooRealVar('alphal', 'CB left switchover', 0.1, 10.0) 
+  cb_nl = ROOT.RooRealVar('nl', 'CB left power', 0.1, 10.0) 
+  cb_alphar = ROOT.RooRealVar('alphar', 'CB right switchover', 0.1, 10.0) 
+  cb_nr = ROOT.RooRealVar('nr', 'CB right power', 0.1, 10.0) 
+  sigma.setVal(3.0)
+  cb_alphal.setVal(2.0)
+  cb_alphar.setVal(2.0)
+  cb_nl.setVal(2.0)
+  cb_nr.setVal(2.0)
+  getattr(workspace,'import')(mu)
+  getattr(workspace,'import')(sigma)
+  getattr(workspace,'import')(cb_alphal)
+  getattr(workspace,'import')(cb_nl)
+  getattr(workspace,'import')(cb_alphar)
+  getattr(workspace,'import')(cb_nr)
+
+  hist = get_histogram(ibin, is_pass)
+  core_hist = ROOT.RooDataHist('pdf_s_core_hist',
+                               'pdf_s_core_hist',
+                               ROOT.RooArgList(fit_var), hist)
+  getattr(workspace,'import')(core_hist)
+  pdf_s_core = ROOT.RooHistPdf('pdf_s_core','pdf_s_core',
+                               ROOT.RooArgSet(fit_var),core_hist)
+  pdf_s_res = ROOT.RooCrystalBall('pdf_s_res','pdf_s_res',fit_var,mu,sigma,
+                                  cb_alphal, cb_nl, cb_alphar, cb_nr)
+  pdf_s = ROOT.RooFFTConvPdf('pdf_s','pdf_s',fit_var,pdf_s_core,pdf_s_res)
+  getattr(workspace,'import')(pdf_s)
+
 def add_signal_model_dscb(workspace, ibin, is_pass):
   '''Adds double-sided crystal ball distribution as signal model
 
@@ -632,11 +714,11 @@ def add_background_model_gamma(workspace, ibin, is_pass):
   '''
   fit_var = workspace.var('fit_var')
   gamma = ROOT.RooRealVar('gamma', 'RooGamma gamma', 0.01, 20.0)
-  beta = ROOT.RooRealVar('beta', 'RooGamma beta', 0.1, 100.0)
+  beta = ROOT.RooRealVar('beta', 'RooGamma beta', 0.5, 100.0)
   gamma_mu = ROOT.RooRealVar('gamma_mu', 'RooGamma mu', 0.0, 60.0)
-  gamma.setVal(2.0)
-  beta.setVal(10.0)
-  gamma_mu.setVal(50.0)
+  gamma.setVal(7.5)
+  beta.setVal(3.5)
+  gamma_mu.setVal(55.0)
   getattr(workspace,'import')(gamma)
   getattr(workspace,'import')(beta)
   getattr(workspace,'import')(gamma_mu)

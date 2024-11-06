@@ -81,7 +81,7 @@ def param_initializer_dscbgaus_from_mc(ibin, is_pass, workspace, mc_analyzer):
     for var in ['mu','sigma','alphal','nl','alphar','nr','gauss_mu',
                 'gauss_sigma','gauss_frac']:
       workspace.var(var).setVal(param_dict[var])
-    for var in ['alphal','nl','alphar','nr','gauss_mu','gauss_sigma',
+    for var in ['sigma','alphal','nl','alphar','nr','gauss_sigma',
                 'gauss_frac']:
       workspace.var(var).setConstant()
 
@@ -252,6 +252,30 @@ def make_data_mc_graph(x, ex, data_y, data_ey, sim_y, sim_ey, name, data_names,
   sf_plot.y_title = y_title
   sf_plot.log_x = log_x
   sf_plot.draw(name)
+
+def make_correction(name, desc, pt_bins, eta_bins, content):
+  '''generates correctionlib correction object
+
+  name     string correction name
+  desc     string correction description
+  pt_bins  list of floats, bin edges
+  eta_bins list of floats, bin edges
+  content  list of floats, content
+  '''
+  return schemav2.Correction(
+      name=name,
+      version=1,
+      inputs=[schemav2.Variable(name='pt', type='real', description='pt'),
+              schemav2.Variable(name='eta', type='real', description='eta')],
+      output=schemav2.Variable(name='sf', type='real', description=desc),
+      data=schemav2.MultiBinning(
+          nodetype='multibinning',
+          inputs=['pt','eta'],
+          edges=[pt_bins, eta_bins],
+          content=content,
+          flow='clamp',
+          ),
+      )
 
 def make_sf_graph(x, ex, y, ey, name, graph_names, x_title, y_title, lumi,
                   log_x=False):
@@ -506,7 +530,7 @@ class RmsSFAnalyzer:
     #this makes liberal use of functools.partial in order to 
     # 1. merge signal and background models
     # 2. pass meta parameters such as location of MC template histograms
-    nom_signal_model = partial(add_signal_model_mcsmear, 
+    nom_signal_model = partial(add_signal_model_mcsumsmear, 
         get_histogram = partial(get_mc_histogram, 
             mc_analyzer = self.mc_nom_tnp_analyzer, 
             highpt_bins = self.highpt_bins))
@@ -587,6 +611,14 @@ class RmsSFAnalyzer:
               +'out/'+altsnb_name+'/'+altsnb_name+'.root')
     self.mc_nom_tnp_analyzer.produce_histograms()
     self.mc_alt_tnp_analyzer.produce_histograms()
+
+  def clean_output(self):
+    '''Cleans the output so efficiencies will be regenerated
+    '''
+    self.data_nom_tnp_analyzer.clean_output()
+    self.data_altsig_tnp_analyzer.clean_output()
+    self.data_altbkg_tnp_analyzer.clean_output()
+    self.data_altsigbkg_tnp_analyzer.clean_output()
 
   def generate_individual_outputs(self):
     '''Generates individual efficiency measurements if they have not already 
@@ -702,6 +734,10 @@ class RmsSFAnalyzer:
     pass_json_uns = []
     fail_json_sfs = []
     fail_json_uns = []
+    json_dat_eff = []
+    json_dat_unc = []
+    json_sim_eff = []
+    json_sim_unc = []
     num_bins_pt = len(self.pt_bins)-1
     num_bins_eta = len(self.eta_bins)-1
     for ipt in range(num_bins_pt):
@@ -724,69 +760,42 @@ class RmsSFAnalyzer:
         pass_json_uns.append(pass_unc[tnp_bin])
         fail_json_sfs.append(fail_sf[tnp_bin])
         fail_json_uns.append(fail_unc[tnp_bin])
+        json_dat_eff.append(data_eff[tnp_bin])
+        json_dat_unc.append(data_unc[tnp_bin])
+        json_sim_eff.append(mc_eff[tnp_bin])
+        json_sim_unc.append(mc_unc[tnp_bin])
 
     if not os.path.isdir('out/'+self.name):
       print('Output directory not found, making new output directory')
       os.mkdir('out/'+self.name)
 
     #write JSON
-    clib_sfs_pass = schemav2.Correction(
-        name='sf_pass',
-        version=1,
-        inputs=[schemav2.Variable(name='pt', type='real', description='pt'),
-                schemav2.Variable(name='eta', type='real', description='eta')],
-        output=schemav2.Variable(name='sf', type='real', description='data-mc sf'),
-        data=schemav2.MultiBinning(
-            nodetype='multibinning',
-            inputs=['pt','eta'],
-            edges=[self.pt_bins,gapincl_eta_bins],
-            content=pass_json_sfs,
-            flow='clamp',
-            ),
-        )
-    clib_uns_pass = schemav2.Correction(
-        name='unc_pass',
-        version=1,
-        inputs=[schemav2.Variable(name='pt', type='real', description='pt'),
-                schemav2.Variable(name='eta', type='real', description='eta')],
-        output=schemav2.Variable(name='sf', type='real', description='data-mc sf'),
-        data=schemav2.MultiBinning(
-            nodetype='multibinning',
-            inputs=['pt','eta'],
-            edges=[self.pt_bins,gapincl_eta_bins],
-            content=pass_json_uns,
-            flow='clamp',
-            ),
-        )
-    clib_sfs_fail = schemav2.Correction(
-        name='sf_fail',
-        version=1,
-        inputs=[schemav2.Variable(name='pt', type='real', description='pt'),
-                schemav2.Variable(name='eta', type='real', description='eta')],
-        output=schemav2.Variable(name='sf', type='real', description='data-mc sf'),
-        data=schemav2.MultiBinning(
-            nodetype='multibinning',
-            inputs=['pt','eta'],
-            edges=[self.pt_bins,gapincl_eta_bins],
-            content=fail_json_sfs,
-            flow='clamp',
-            ),
-        )
-    clib_uns_fail = schemav2.Correction(
-        name='unc_fail',
-        version=1,
-        inputs=[schemav2.Variable(name='pt', type='real', description='pt'),
-                schemav2.Variable(name='eta', type='real', description='eta')],
-        output=schemav2.Variable(name='sf', type='real', description='data-mc sf'),
-        data=schemav2.MultiBinning(
-            nodetype='multibinning',
-            inputs=['pt','eta'],
-            edges=[self.pt_bins,gapincl_eta_bins],
-            content=fail_json_uns,
-            flow='clamp',
-            ),
-        )
-    with open('out/{0}/{0}_scalefactors.json'.format(self.name),'w') as output_file:
+    clib_sfs_pass = make_correction('sf_pass', 'data-MC SF', self.pt_bins, 
+                                    gapincl_eta_bins, pass_json_sfs)
+    clib_uns_pass = make_correction('unc_pass', 'data-MC unc', self.pt_bins, 
+                                    gapincl_eta_bins, pass_json_uns)
+    clib_sfs_fail = make_correction('sf_fail', 'data-MC SF', self.pt_bins, 
+                                    gapincl_eta_bins, fail_json_sfs)
+    clib_uns_fail = make_correction('unc_fail', 'data-MC unc', self.pt_bins, 
+                                    gapincl_eta_bins, fail_json_uns)
+    clib_dat_eff = make_correction('effdata', 'data eff', self.pt_bins, 
+                                   gapincl_eta_bins, json_dat_eff)
+    clib_dat_unc = make_correction('systdata', 'data unc', self.pt_bins, 
+                                   gapincl_eta_bins, json_dat_unc)
+    clib_sim_eff = make_correction('effmc', 'MC eff', self.pt_bins, 
+                                   gapincl_eta_bins, json_sim_eff)
+    clib_sim_unc = make_correction('systmc', 'MC unc', self.pt_bins, 
+                                   gapincl_eta_bins, json_sim_unc)
+
+    sf_filename = 'out/{0}/{0}_scalefactors.json'.format(self.name)
+    eff_filename = 'out/{0}/{0}_efficiencies.json'.format(self.name)
+    with open(eff_filename,'w') as output_file:
+      output_file.write(fix_correctionlib_json(
+        [clib_dat_eff.json(exclude_unset=True),
+         clib_dat_unc.json(exclude_unset=True),
+         clib_sim_eff.json(exclude_unset=True),
+         clib_sim_unc.json(exclude_unset=True)]))
+    with open(sf_filename,'w') as output_file:
       output_file.write(fix_correctionlib_json(
         [clib_sfs_pass.json(exclude_unset=True),
          clib_uns_pass.json(exclude_unset=True),
@@ -1031,6 +1040,7 @@ class RmsSFAnalyzer:
         print('                               altb,altsb,mc) use bin and pass(=p/f) to ')
         print('                               start from a particular bin and category')
         print('o(utput)                       generate final outputs')
+        print('c(lean)                        cleans previous output')
         print('q(uit)                         exit')
         print('(pre)v(ious)                   list previous commands entered')
       elif (user_input[0] == 'p' or user_input[0] == 'produce'):
@@ -1046,28 +1056,32 @@ class RmsSFAnalyzer:
           starting_cat = user_input[3]
         if (user_input[1] == 'nom'):
           #avoid accessing the same ROOT file in multiple tnp_analyzers
-          if self.mc_nom_tnp_analyzer.temp_file != None:
-            self.mc_nom_tnp_analyzer.temp_file.Close()
+          self.mc_nom_tnp_analyzer.close_file()
+          self.data_nom_tnp_analyzer.close_file()
           self.data_nom_tnp_analyzer.fit_histogram(starting_bin,starting_cat,
                                                    self.nom_fn_name)
         elif (user_input[1] == 'alts' or user_input[1] == 'altsignal'):
+          self.data_altsig_tnp_analyzer.close_file()
           self.data_altsig_tnp_analyzer.fit_histogram(starting_bin,
                                                       starting_cat,
                                                       self.alts_fn_name,
                                                       self.alts_fn_init)
         elif (user_input[1] == 'altb' or user_input[1] == 'altbackground'):
           #avoid accessing the same ROOT file in multiple tnp_analyzers
-          if self.mc_nom_tnp_analyzer.temp_file != None:
-            self.mc_nom_tnp_analyzer.temp_file.Close()
+          self.mc_nom_tnp_analyzer.close_file()
+          self.data_altbkg_tnp_analyzer.close_file()
           self.data_altbkg_tnp_analyzer.fit_histogram(starting_bin,
                                                       starting_cat,
                                                       self.altb_fn_name)
-        elif (user_input[1] == 'altsb' or user_input[1] == 'altsignalbackground'):
+        elif (user_input[1] == 'altsb' or 
+              user_input[1] == 'altsignalbackground'):
+          self.data_altsigbkg_tnp_analyzer.close_file()
           self.data_altsigbkg_tnp_analyzer.fit_histogram(starting_bin,
                                                          starting_cat,
                                                          self.altsb_fn_name,
                                                          self.alts_fn_init)
         elif (user_input[1] == 'mc' or user_input[1] == 'mcalt'):
+          self.mc_nom_tnp_analyzer.close_file()
           self.mc_nom_tnp_analyzer.fit_histogram(starting_bin,
                                                  starting_cat,
                                                  self.alts_fn_name_sa)
@@ -1078,6 +1092,8 @@ class RmsSFAnalyzer:
         self.generate_output()
       elif (user_input[0] == 'q' or user_input[0] == 'quit'):
         exit_loop = True
+      elif (user_input[0] == 'c' or user_input[0] == 'clean'):
+        self.clean_output()
       elif (user_input[0] == 'v' or user_input[0] == 'previous'):
         for past_command in past_commands:
           print(past_command)

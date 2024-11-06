@@ -248,6 +248,14 @@ class TnpAnalyzer:
       if self.temp_file == None:
         self.temp_file = ROOT.TFile(temp_file_name,'UPDATE')
 
+  def close_file(self):
+    '''
+    Closes temp file
+    '''
+    if (self.temp_file != None):
+      self.temp_file.Close()
+      self.temp_file = None
+
   def produce_histograms(self):
     '''
     Processes the input file(s) and generates histograms for use in fitting
@@ -495,9 +503,11 @@ class TnpAnalyzer:
              self.fit_histogram('0', 'f', model, 
                                 param_initializer)
             else:
-              print('Exiting interactive fitter.')
+              print('Exiting interactive fitter bin {} category {}.'
+                  .format(ibin_str, pass_probe))
         else:
-          print('Exiting interactive fitter.')
+          print('Exiting interactive fitter bin {} category {}.'
+              .format(ibin_str, pass_probe))
         exit_loop = True
 
   def draw_fit_set(self, ibin, filename):
@@ -618,11 +628,19 @@ class TnpAnalyzer:
         pad_text += ('{}F = {:.4f} #pm {:.4f}\n'.format(
             param_name, fail_param_dict[param_name], fail_param_dict[param_name+'_unc']))
     latex = ROOT.TLatex()
-    latex.SetTextSize(0.03)
+    latex.SetTextSize(0.025)
     write_multiline_latex(0.1,0.9,latex,pad_text)
     canvas.SaveAs(filename)
 
     return (eff, unc)
+
+  def clean_output(self):
+    plot_filename = 'out/'+self.temp_name+'/allfits.pdf'
+    effi_filename = 'out/'+self.temp_name+'/efficiencies.json'
+    if os.path.exists(plot_filename):
+      os.remove(plot_filename)
+    if os.path.exists(effi_filename):
+      os.remove(effi_filename)
 
   def generate_final_output(self):
     '''
