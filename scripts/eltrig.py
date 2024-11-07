@@ -25,9 +25,11 @@ if __name__=='__main__':
   mcalt_filenames = ['/data2/oshiro/ntuples/2016APV/DY_LO_L1matched.root']
   measurement_cut = 'passHltEle27WPTightGsf'
   measurement_desc = 'HLT_Ele27_WPTight_Gsf'
-  preselection = 'tag_Ele_pt>40&&tag_Ele_abseta<2.17&&(tag_Ele_q+el_q)==0&&el_pt>7&&fabs(el_sc_eta)<2.5&&fabs(el_dz)<1.0&&fabs(el_dxy)<0.5&&passingMVA94XwpLooseisoV2'
+  preselection = ('tag_Ele_pt>40&&tag_Ele_abseta<2.17&&(tag_Ele_q+el_q)==0'
+                 +'&&el_pt>7&&fabs(el_sc_eta)<2.5&&fabs(el_dz)<1.0'
+                 +'&&fabs(el_dxy)<0.5&&passingMVA94XwpLooseisoV2')
   analyzer_name = 'eltrig27'
-  year = '2016APV'
+  year = args.year
   pt_binning = [7.0,25.0,26.0,27.0,28.0,29.0,31.0,35.0,50.0,100.0,500.0]
   eta_binning = [-2.5,-2.0,-1.5,-0.8,0.0,0.8,1.5,2.0,2.5]
   gappt_binning = [7.0,25.0,35.0,500.0]
@@ -45,6 +47,13 @@ if __name__=='__main__':
     pt_binning = [7.0,11.0,12.0,13.0,14.0,16.0,20.0,30.0,50.0,100.0,500.0]
     eta_binning = [-2.5,-2.0,-1.5,-0.8,0.0,0.8,1.5,2.0,2.5]
     gappt_binning = [7.0,12.0,35.0,500.0]
+  if (year == '2016'):
+    file_path = '/eos/cms/store/group/phys_egamma/tnpTuples/rasharma/2021-02-10/UL2016postVFP/merged/'
+    data_filenames = [file_path+'Run2016F_L1merged.root',
+                      file_path+'Run2016G_L1matched.root',
+                      file_path+'Run2016H_L1matched.root']
+    mc_filenames = [file_path+'DY_NLO_L1matched.root']
+    mcalt_filenames = [file_path+'DY_LO_L1matched.root']
 
   analyzer_name = 'hzg_'+analyzer_name+'_'+year
   
