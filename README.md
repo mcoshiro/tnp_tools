@@ -10,7 +10,44 @@ In high-energy physics, a common task is to derive corrections for simulated sam
 
 ## Setting the environment
 
-Before running this code, one needs ROOT, pdflatex, python3, and CorrectionLib (TODO: determine minimal versions). For those working on the UCSB servers, there is a file `set_env.sh` that can be used to set up the environment.
+Before running this code, one needs ROOT, pdflatex, python3, and CorrectionLib (TODO: determine minimal versions). 
+
+#### UCSB
+For those working on the UCSB servers, there is a file `set_env.sh` that can be used to set up the environment.
+
+#### lxplus
+For those working on lxplus (el9_amd64_gcc12), a working configuration is is shown:
+
+- correctionlib 2.5.0
+
+- ROOT 6.32.06
+
+- python 3.9.18
+
+To easily set this up, navigate to your workspace, and set up a virtual environment:
+~~~~bash
+python3 -m venv my_env_name
+source my_env_name/bin/activate
+~~~~
+
+Install a compatible version of correctionlib
+~~~~bash
+pip install --force-reinstall -v "correctionlib==2.5.0"
+~~~~
+
+Activate ROOT. This needs to be done every time the virtual environment is activated. There may be workarounds with macros.
+~~~~bash
+source /cvmfs/sft.cern.ch/lcg/app/releases/ROOT/6.32.06/x86_64-almalinux9.4-gcc114-opt/bin/thisroot.sh
+~~~~
+The ROOT version and architecture may work in other configurations.
+Navigate to the tnp_tools directory, and complete the setup with
+~~~~bash
+source set_env_lxplus.sh
+~~~~
+Now you are free to begin using the tool, by a command such as 
+`python3 scripts/eltrig.py -y 2016 -t singleel`
+
+When finished using the tools, exit the environment with `deactivate`.
 
 ## Running the code - typical use
 
