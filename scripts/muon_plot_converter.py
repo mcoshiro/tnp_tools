@@ -46,6 +46,7 @@ if __name__=='__main__':
   elif args.year == '2017':
     pog_year = 'Run2017_UL'
     if args.trigger == 'singlemu':
+      trig_threshold = '27'
       tnp_basename = 'NUM_IsoMu27'
       n_pt_bins = 11
   elif args.year=='2018':

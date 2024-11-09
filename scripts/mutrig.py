@@ -15,7 +15,6 @@ if __name__=='__main__':
       'dimu8'],default='singlemu')
   args = argument_parser.parse_args()
   
-  #default: 2016APV ele27
   #currently filenames aren't used here since the plots come from tnp
   data_filenames = ['/data2/oshiro/ntuples/2016APV/Run2016B_L1matched.root',
                     '/data2/oshiro/ntuples/2016APV/Run2016C_L1matched.root',
@@ -42,6 +41,14 @@ if __name__=='__main__':
     measurement_desc = 'Dimuon trigger, 8 GeV leg'
     analyzer_name = 'mutrig8'
     pt_binning = [5.0,7.75,8.0,8.1,8.25,8.5,10.0,15.0,40.0,100.0,200.0,500.0]
+
+  if args.year == '2017':
+    if args.trig == 'singlemu':
+      measurement_cut = 'HLT_IsoMu27'
+      measurement_desc = 'HLT_IsoMu27'
+      analyzer_name = 'mutrig27'
+      pt_binning = [5.0,26.75,27.0,27.25,27.5,29.0,32.0,40.0,60.0,120.0,200.0,
+                    500.0]
 
   analyzer_name = 'hzg_'+analyzer_name+'_'+year
   
