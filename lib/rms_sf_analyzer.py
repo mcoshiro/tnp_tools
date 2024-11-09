@@ -476,6 +476,35 @@ class RmsSFAnalyzer:
       if is_high_pt[ibin]:
         self.highpt_bins.append(ibin)
 
+  def add_standard_binning(self, pt_bins, eta_bins, pt_var_name, eta_var_name):
+    '''
+    Creates standard pt-eta binning 
+
+    pt_bins       list of floats, pt bin edges
+    eta_bins      list of floats, eta bin edges
+    pt_var_name   string, name of pt variable
+    eta_var_name  string, name of eta variable
+    '''
+    bin_selections = []
+    bin_names = []
+    is_high_pt = []
+    for ipt in range(len(pt_bins)-1):
+      for ieta in range(len(eta_bins)-1):
+        bin_selections.append('{}<{}&&{}<{}&&{}<{}&&{}<{}'.format(
+            pt_bins[ipt],pt_var_name,pt_var_name,pt_bins[ipt+1],
+            eta_bins[ieta],eta_var_name,eta_var_name,eta_bins[ieta+1]))
+        bin_names.append('{}<p_{{T}}<{} GeV, {}<#eta<{}'.format(
+            pt_bins[ipt],pt_bins[ipt+1],eta_bins[ieta],eta_bins[ieta+1]))
+        if (pt_bins[ipt]>70.0):
+          is_high_pt.append(True)
+        else:
+          is_high_pt.append(False)
+    self.binning_type = 'std'
+    self.add_custom_binning(bin_selections, bin_names, is_high_pt)
+    self.pt_bins = pt_bins
+    self.eta_bins = eta_bins
+    self.gap_pt_bins = []
+
   def add_standard_gap_binning(self, pt_bins, eta_bins, gap_pt_bins, pt_var_name, eta_var_name):
     '''
     Creates standard binning including specialized pt bins for gap region
@@ -625,10 +654,6 @@ class RmsSFAnalyzer:
     been generated and checks output files are generated correctly. Returns
     true if the outputs are generated correctly
     '''
-    if (self.binning_type != 'std_gap'):
-      print('ERROR: only standard gap binning currently supported for ',end='')
-      print('automatic output formatting')
-      return False
     nomdat_name = self.name+'_data_nom'
     altsig_name = self.name+'_data_altsig'
     altbkg_name = self.name+'_data_altbkg'
@@ -728,6 +753,83 @@ class RmsSFAnalyzer:
       fail_sf.append(sfs[2])
       fail_unc.append(sfs[3])
 
+    if self.binning_type=='std':
+      self.generate_jsons_nogap(data_eff, data_unc, mc_eff, mc_unc, 
+                                pass_sf, pass_unc, fail_sf, fail_unc)
+      self.generate_summary_plots_nogap(data_eff, data_unc, mc_eff, mc_unc,
+                                        pass_sf, pass_unc, fail_sf, fail_unc)
+    elif self.binning_type=='std_gap':
+      self.generate_jsons_gap(data_eff, data_unc, mc_eff, mc_unc, pass_sf, 
+                              pass_unc, fail_sf, fail_unc)
+      self.generate_summary_plots_gap(data_eff, data_unc, mc_eff, mc_unc,
+                                      pass_sf, pass_unc, fail_sf, fail_unc)
+    else:
+      raise RuntimeError('Unsupported binning')
+
+  def generate_jsons_nogap(self, data_eff, data_unc, mc_eff, mc_unc, pass_sf,
+                           pass_unc, fail_sf, fail_unc):
+    '''Generate output assuming standard binning with no gap
+
+    data_eff  list of data efficiencies
+    data_unc  list of data uncertainties
+    mc_eff    list of mc efficiencies
+    mc_unc    list of mc uncertainties
+    pass_sf   list of scale factors (SFs) for passing selection
+    pass_unc  list of uncertainties on passing SFs
+    fail_sf   list of scale factors for failing selection
+    fail_unc  list of uncertainties on failing SFs
+    '''
+
+    if not os.path.isdir('out/'+self.name):
+      print('Output directory not found, making new output directory')
+      os.mkdir('out/'+self.name)
+
+    #write JSON
+    clib_sfs_pass = make_correction('sf_pass', 'data-MC SF', self.pt_bins, 
+                                    self.eta_bins, pass_sf)
+    clib_uns_pass = make_correction('unc_pass', 'data-MC unc', self.pt_bins, 
+                                    self.eta_bins, pass_unc)
+    clib_sfs_fail = make_correction('sf_fail', 'data-MC SF', self.pt_bins, 
+                                    self.eta_bins, fail_sf)
+    clib_uns_fail = make_correction('unc_fail', 'data-MC unc', self.pt_bins, 
+                                    self.eta_bins, fail_unc)
+    clib_dat_eff = make_correction('effdata', 'data eff', self.pt_bins, 
+                                   self.eta_bins, data_eff)
+    clib_dat_unc = make_correction('systdata', 'data unc', self.pt_bins, 
+                                   self.eta_bins, data_unc)
+    clib_sim_eff = make_correction('effmc', 'MC eff', self.pt_bins, 
+                                   self.eta_bins, mc_eff)
+    clib_sim_unc = make_correction('systmc', 'MC unc', self.pt_bins, 
+                                   self.eta_bins, mc_unc)
+
+    sf_filename = 'out/{0}/{0}_scalefactors.json'.format(self.name)
+    eff_filename = 'out/{0}/{0}_efficiencies.json'.format(self.name)
+    with open(eff_filename,'w') as output_file:
+      output_file.write(fix_correctionlib_json(
+        [clib_dat_eff.json(exclude_unset=True),
+         clib_dat_unc.json(exclude_unset=True),
+         clib_sim_eff.json(exclude_unset=True),
+         clib_sim_unc.json(exclude_unset=True)]))
+    with open(sf_filename,'w') as output_file:
+      output_file.write(fix_correctionlib_json(
+        [clib_sfs_pass.json(exclude_unset=True),
+         clib_uns_pass.json(exclude_unset=True),
+         clib_sfs_fail.json(exclude_unset=True),
+         clib_uns_fail.json(exclude_unset=True)]))
+
+  def generate_jsons_gap(self, data_eff, data_unc, mc_eff, mc_unc, pass_sf, 
+                         pass_unc, fail_sf, fail_unc):
+    '''Generate output assuming standard gap binning
+
+    data_eff  list of data efficiencies
+    data_unc  list of data uncertainties
+    mc_eff    list of mc efficiencies
+    mc_unc    list of mc uncertainties
+    pass_sf   list of scale factors (SFs) for passing selection
+    pass_unc  list of uncertainties on passing SFs
+    fail_sf   list of scale factors for failing selection
+    fail_unc  list of uncertainties on failing SFs
+    '''
     #organize SFs as they will be saved in the JSON
     gapincl_eta_bins, neg_gap_idx, pos_gap_idx = add_gap_eta_bins(self.eta_bins)
     pass_json_sfs = []
@@ -801,11 +903,174 @@ class RmsSFAnalyzer:
          clib_uns_pass.json(exclude_unset=True),
          clib_sfs_fail.json(exclude_unset=True),
          clib_uns_fail.json(exclude_unset=True)]))
-    self.generate_summary_plots(data_eff, data_unc, mc_eff, mc_unc, pass_sf, 
-                                pass_unc, fail_sf, fail_unc)
 
-  def generate_summary_plots(self, data_eff, data_unc, mc_eff, mc_unc, pass_sf, 
-                             pass_unc, fail_sf, fail_unc):
+  def generate_summary_plots_nogap(self, data_eff, data_unc, mc_eff, mc_unc, 
+                                 pass_sf, pass_unc, fail_sf, fail_unc):
+    '''generate following plots: 1D eta efficiency plot with MC & data
+                              1D pt efficiency plot with MC & data
+                              gap 1D pt efficiency plot with MC & data
+                              2D efficiency plot with MC
+                              2D efficiency plot with data
+                              1D eta SF plot pass
+                              1D eta SF plot fail
+                              1D pt SF plot pass
+                              1D pt SF plot fail
+                              gap 1D pt SF plot pass
+                              gap 1D pt SF plot fail
+                              2D SF plot pass
+                              2D SF plot fail
+                              2D SF uncertainty plot pass
+                              2D SF uncertainty plot fail
+
+    data_eff  list of data efficiencies
+    data_unc  list of data uncertainties
+    mc_eff    list of mc efficiencies
+    mc_unc    list of mc uncertainties
+    pass_sf   list of scale factors (SFs) for passing selection
+    pass_unc  list of uncertainties on passing SFs
+    fail_sf   list of scale factors for failing selection
+    fail_unc  list of uncertainties on failing SFs
+    '''
+    eta_plot_x = []
+    eta_plot_ex = []
+    pt_plot_x = []
+    pt_plot_ex = []
+    eff_eta_plot_data_y = []
+    eff_eta_plot_data_ey = []
+    eff_eta_plot_mc_y = []
+    eff_eta_plot_mc_ey = []
+    eff_pt_plot_data_y = []
+    eff_pt_plot_data_ey = []
+    eff_pt_plot_mc_y = []
+    eff_pt_plot_mc_ey = []
+    sf_eta_plot_pass_y = []
+    sf_eta_plot_pass_ey = []
+    sf_eta_plot_fail_y = []
+    sf_eta_plot_fail_ey = []
+    sf_pt_plot_pass_y = []
+    sf_pt_plot_pass_ey = []
+    sf_pt_plot_fail_y = []
+    sf_pt_plot_fail_ey = []
+    eta_plot_names = []
+    eta_plot_data_names = []
+    eta_plot_mc_names = []
+    pt_plot_names = []
+    pt_plot_data_names = []
+    pt_plot_mc_names = []
+
+    for ieta in range(len(self.eta_bins)-1):
+      eta_plot_x.append((self.eta_bins[ieta+1]+self.eta_bins[ieta])/2.0)
+      eta_plot_ex.append((self.eta_bins[ieta+1]-self.eta_bins[ieta])/2.0)
+      pt_plot_names.append('{}<|#eta|<{}'.format(self.eta_bins[ieta],self.eta_bins[ieta+1]))
+      pt_plot_data_names.append('Data {}<|#eta|<{}'.format(self.eta_bins[ieta],self.eta_bins[ieta+1]))
+      pt_plot_mc_names.append('MC {}<|#eta|<{}'.format(self.eta_bins[ieta],self.eta_bins[ieta+1]))
+      eff_pt_plot_data_y.append([])
+      eff_pt_plot_data_ey.append([])
+      eff_pt_plot_mc_y.append([])
+      eff_pt_plot_mc_ey.append([])
+      sf_pt_plot_pass_y.append([])
+      sf_pt_plot_pass_ey.append([])
+      sf_pt_plot_fail_y.append([])
+      sf_pt_plot_fail_ey.append([])
+    for ipt in range(len(self.pt_bins)-1):
+      pt_plot_x.append((self.pt_bins[ipt+1]+self.pt_bins[ipt])/2.0)
+      pt_plot_ex.append((self.pt_bins[ipt+1]-self.pt_bins[ipt])/2.0)
+      eta_plot_names.append('{}<p_{{T}}<{} GeV'.format(self.pt_bins[ipt],self.pt_bins[ipt+1]))
+      eta_plot_data_names.append('Data {}<p_{{T}}<{} GeV'.format(self.pt_bins[ipt],self.pt_bins[ipt+1]))
+      eta_plot_mc_names.append('MC {}<p_{{T}}<{} GeV'.format(self.pt_bins[ipt],self.pt_bins[ipt+1]))
+      eff_eta_plot_data_y.append([])
+      eff_eta_plot_data_ey.append([])
+      eff_eta_plot_mc_y.append([])
+      eff_eta_plot_mc_ey.append([])
+      sf_eta_plot_pass_y.append([])
+      sf_eta_plot_pass_ey.append([])
+      sf_eta_plot_fail_y.append([])
+      sf_eta_plot_fail_ey.append([])
+
+    for ipt in range(len(self.pt_bins)-1):
+      for ieta in range(len(self.eta_bins)-1):
+        tnp_bin = ieta+ipt*(len(self.eta_bins)-1)
+        eff_eta_plot_data_y[ipt].append(data_eff[tnp_bin])
+        eff_eta_plot_data_ey[ipt].append(data_unc[tnp_bin])
+        eff_eta_plot_mc_y[ipt].append(mc_eff[tnp_bin])
+        eff_eta_plot_mc_ey[ipt].append(mc_unc[tnp_bin])
+        eff_pt_plot_data_y[ieta].append(data_eff[tnp_bin])
+        eff_pt_plot_data_ey[ieta].append(data_unc[tnp_bin])
+        eff_pt_plot_mc_y[ieta].append(mc_eff[tnp_bin])
+        eff_pt_plot_mc_ey[ieta].append(mc_unc[tnp_bin])
+        sf_eta_plot_pass_y[ipt].append(pass_sf[tnp_bin])
+        sf_eta_plot_pass_ey[ipt].append(pass_unc[tnp_bin])
+        sf_eta_plot_fail_y[ipt].append(fail_sf[tnp_bin])
+        sf_eta_plot_fail_ey[ipt].append(fail_unc[tnp_bin])
+        sf_pt_plot_pass_y[ieta].append(pass_sf[tnp_bin])
+        sf_pt_plot_pass_ey[ieta].append(pass_unc[tnp_bin])
+        sf_pt_plot_fail_y[ieta].append(fail_sf[tnp_bin])
+        sf_pt_plot_fail_ey[ieta].append(fail_unc[tnp_bin])
+
+    eff_string = 'Efficiency '+self.data_nom_tnp_analyzer.measurement_desc
+    eff_string = 'Efficiency '+self.data_nom_tnp_analyzer.measurement_desc
+    unc_string = 'Eff. Unc. '+self.data_nom_tnp_analyzer.measurement_desc
+    passsf_string = 'Pass SF '+self.data_nom_tnp_analyzer.measurement_desc
+    failsf_string = 'Fail SF '+self.data_nom_tnp_analyzer.measurement_desc
+    passunc_string = 'Pass SF Unc. '+self.data_nom_tnp_analyzer.measurement_desc
+    failunc_string = 'Fail SF Unc. '+self.data_nom_tnp_analyzer.measurement_desc
+    for fit_syst in ['data_nom','data_altsig','data_altbkg','data_altsigbkg','mc_nom']:
+      os.system('cp out/{0}_{1}/allfits.pdf out/{0}/{1}_allfits.pdf'.format(self.name,fit_syst))
+    make_data_mc_graph(eta_plot_x, eta_plot_ex, eff_eta_plot_data_y, 
+                       eff_eta_plot_data_ey, eff_eta_plot_mc_y, 
+                       eff_eta_plot_mc_ey, 
+                       'out/{0}/{0}_eff_etabinned.pdf'.format(self.name), 
+                       eta_plot_data_names, eta_plot_mc_names,
+                       '|#eta|', eff_string, LUMI_TAGS[self.year])
+    make_data_mc_graph(pt_plot_x, pt_plot_ex, eff_pt_plot_data_y, 
+                       eff_pt_plot_data_ey, eff_pt_plot_mc_y, 
+                       eff_pt_plot_mc_ey, 
+                       'out/{0}/{0}_eff_ptbinned.pdf'.format(self.name),
+                       pt_plot_data_names, pt_plot_mc_names,
+                       'p_{T} [GeV]', eff_string, LUMI_TAGS[self.year],True)
+    make_heatmap(self.eta_bins, self.pt_bins, eff_pt_plot_data_y, 
+                 'out/{0}/{0}_eff_data.pdf'.format(self.name), '|#eta|', 
+                 'p_{T} [GeV]', 
+                 eff_string, LUMI_TAGS[self.year],False,True)
+    make_heatmap(self.eta_bins, self.pt_bins, eff_pt_plot_mc_y, 
+                 'out/{0}/{0}_eff_mc.pdf'.format(self.name), '|#eta|', 
+                 'p_{T} [GeV]',
+                 eff_string, LUMI_TAGS[self.year],False,True)
+    make_sf_graph(eta_plot_x, eta_plot_ex, sf_eta_plot_pass_y, 
+                  sf_eta_plot_pass_ey, 
+                  'out/{0}/{0}_sfpass_etabinned.pdf'.format(self.name),
+                  eta_plot_names, '|#eta|', 'Pass SF', LUMI_TAGS[self.year])
+    make_sf_graph(eta_plot_x, eta_plot_ex, sf_eta_plot_fail_y, 
+                  sf_eta_plot_fail_ey, 
+                  'out/{0}/{0}_sffail_etabinned.pdf'.format(self.name),
+                  eta_plot_names, '|#eta|', 'Fail SF', LUMI_TAGS[self.year])
+    make_sf_graph(pt_plot_x, pt_plot_ex, sf_pt_plot_pass_y, sf_pt_plot_pass_ey,
+                  'out/{0}/{0}_sfpass_ptbinned.pdf'.format(self.name),
+                  pt_plot_names, 'p_{T} [GeV]', 'Pass SF', LUMI_TAGS[self.year],
+                  True)
+    make_sf_graph(pt_plot_x, pt_plot_ex, sf_pt_plot_fail_y, sf_pt_plot_fail_ey, 
+                  'out/{0}/{0}_sffail_ptbinned.pdf'.format(self.name),
+                  pt_plot_names, 'p_{T} [GeV]', 'Fail SF', LUMI_TAGS[self.year],
+                  True)
+    make_heatmap(self.eta_bins, self.pt_bins, sf_pt_plot_pass_y, 
+                 'out/{0}/{0}_sfpass.pdf'.format(self.name), '|#eta|', 
+                 'p_{T} [GeV]', passsf_string, LUMI_TAGS[self.year], False, 
+                 True)
+    make_heatmap(self.eta_bins, self.pt_bins, sf_pt_plot_fail_y, 
+                 'out/{0}/{0}_sffail.pdf'.format(self.name), '|#eta|', 
+                 'p_{T} [GeV]', failsf_string, LUMI_TAGS[self.year], False, 
+                 True)
+    make_heatmap(self.eta_bins, self.pt_bins, sf_pt_plot_pass_ey, 
+                 'out/{0}/{0}_sfpass_unc.pdf'.format(self.name), '|#eta|', 
+                 'p_{T} [GeV]', passunc_string, LUMI_TAGS[self.year], False, 
+                 True)
+    make_heatmap(self.eta_bins, self.pt_bins, sf_pt_plot_fail_ey, 
+                 'out/{0}/{0}_sffail_unc.pdf'.format(self.name), '|#eta|', 
+                 'p_{T} [GeV]', failunc_string, LUMI_TAGS[self.year], False, 
+                 True)
+
+  def generate_summary_plots_gap(self, data_eff, data_unc, mc_eff, mc_unc, 
+                                 pass_sf, pass_unc, fail_sf, fail_unc):
     '''generate following plots: 1D eta efficiency plot with MC & data
                               1D pt efficiency plot with MC & data
                               gap 1D pt efficiency plot with MC & data
@@ -950,6 +1215,11 @@ class RmsSFAnalyzer:
         sf_gappt_plot_fail_ey[ieta].append(fail_unc[tnp_bin])
 
     eff_string = 'Efficiency '+self.data_nom_tnp_analyzer.measurement_desc
+    unc_string = 'Eff. Unc. '+self.data_nom_tnp_analyzer.measurement_desc
+    passsf_string = 'Pass SF '+self.data_nom_tnp_analyzer.measurement_desc
+    failsf_string = 'Fail SF '+self.data_nom_tnp_analyzer.measurement_desc
+    passunc_string = 'Pass SF Unc. '+self.data_nom_tnp_analyzer.measurement_desc
+    failunc_string = 'Fail SF Unc. '+self.data_nom_tnp_analyzer.measurement_desc
     for fit_syst in ['data_nom','data_altsig','data_altbkg','data_altsigbkg','mc_nom']:
       os.system('cp out/{0}_{1}/allfits.pdf out/{0}/{1}_allfits.pdf'.format(self.name,fit_syst))
     make_data_mc_graph(eta_plot_x, eta_plot_ex, eff_eta_plot_data_y, 
@@ -1004,16 +1274,20 @@ class RmsSFAnalyzer:
                   LUMI_TAGS[self.year], True)
     make_heatmap(self.eta_bins, self.pt_bins, sf_pt_plot_pass_y, 
                  'out/{0}/{0}_sfpass.pdf'.format(self.name), '#eta', 
-                 'p_{T} [GeV]', eff_string, LUMI_TAGS[self.year], False, True)
+                 'p_{T} [GeV]', passsf_string, LUMI_TAGS[self.year], False, 
+                 True)
     make_heatmap(self.eta_bins, self.pt_bins, sf_pt_plot_fail_y, 
                  'out/{0}/{0}_sffail.pdf'.format(self.name), '#eta', 
-                 'p_{T} [GeV]', eff_string, LUMI_TAGS[self.year], False, True)
+                 'p_{T} [GeV]', failsf_string, LUMI_TAGS[self.year], False, 
+                 True)
     make_heatmap(self.eta_bins, self.pt_bins, sf_pt_plot_pass_ey, 
                  'out/{0}/{0}_sfpass_unc.pdf'.format(self.name), '#eta', 
-                 'p_{T} [GeV]', eff_string, LUMI_TAGS[self.year], False, True)
+                 'p_{T} [GeV]', passunc_string, LUMI_TAGS[self.year], False, 
+                 True)
     make_heatmap(self.eta_bins, self.pt_bins, sf_pt_plot_fail_ey, 
                  'out/{0}/{0}_sffail_unc.pdf'.format(self.name), '#eta', 
-                 'p_{T} [GeV]', eff_string, LUMI_TAGS[self.year], False, True)
+                 'p_{T} [GeV]', failunc_string, LUMI_TAGS[self.year], False, 
+                 True)
 
   def run_interactive(self):
     '''
@@ -1046,47 +1320,48 @@ class RmsSFAnalyzer:
       elif (user_input[0] == 'p' or user_input[0] == 'produce'):
         self.produce_histograms()
       elif (user_input[0] == 'f' or user_input[0] == 'fit'):
-        if (len(user_input)<2):
+        if len(user_input)<2:
           print('ERROR: f(it) requires an argument')
-        starting_bin = '0'
-        starting_cat = 'p'
-        if (len(user_input)>=3):
-          starting_bin = user_input[2]
-        if (len(user_input)>=4):
-          starting_cat = user_input[3]
-        if (user_input[1] == 'nom'):
-          #avoid accessing the same ROOT file in multiple tnp_analyzers
-          self.mc_nom_tnp_analyzer.close_file()
-          self.data_nom_tnp_analyzer.close_file()
-          self.data_nom_tnp_analyzer.fit_histogram(starting_bin,starting_cat,
-                                                   self.nom_fn_name)
-        elif (user_input[1] == 'alts' or user_input[1] == 'altsignal'):
-          self.data_altsig_tnp_analyzer.close_file()
-          self.data_altsig_tnp_analyzer.fit_histogram(starting_bin,
-                                                      starting_cat,
-                                                      self.alts_fn_name,
-                                                      self.alts_fn_init)
-        elif (user_input[1] == 'altb' or user_input[1] == 'altbackground'):
-          #avoid accessing the same ROOT file in multiple tnp_analyzers
-          self.mc_nom_tnp_analyzer.close_file()
-          self.data_altbkg_tnp_analyzer.close_file()
-          self.data_altbkg_tnp_analyzer.fit_histogram(starting_bin,
-                                                      starting_cat,
-                                                      self.altb_fn_name)
-        elif (user_input[1] == 'altsb' or 
-              user_input[1] == 'altsignalbackground'):
-          self.data_altsigbkg_tnp_analyzer.close_file()
-          self.data_altsigbkg_tnp_analyzer.fit_histogram(starting_bin,
-                                                         starting_cat,
-                                                         self.altsb_fn_name,
-                                                         self.alts_fn_init)
-        elif (user_input[1] == 'mc' or user_input[1] == 'mcalt'):
-          self.mc_nom_tnp_analyzer.close_file()
-          self.mc_nom_tnp_analyzer.fit_histogram(starting_bin,
-                                                 starting_cat,
-                                                 self.alts_fn_name_sa)
         else:
-          print('ERROR: unrecognized argument to f(it)')
+          starting_bin = '0'
+          starting_cat = 'p'
+          if (len(user_input)>=3):
+            starting_bin = user_input[2]
+          if (len(user_input)>=4):
+            starting_cat = user_input[3]
+          if (user_input[1] == 'nom'):
+            #avoid accessing the same ROOT file in multiple tnp_analyzers
+            self.mc_nom_tnp_analyzer.close_file()
+            self.data_nom_tnp_analyzer.close_file()
+            self.data_nom_tnp_analyzer.fit_histogram(starting_bin,starting_cat,
+                                                     self.nom_fn_name)
+          elif (user_input[1] == 'alts' or user_input[1] == 'altsignal'):
+            self.data_altsig_tnp_analyzer.close_file()
+            self.data_altsig_tnp_analyzer.fit_histogram(starting_bin,
+                                                        starting_cat,
+                                                        self.alts_fn_name,
+                                                        self.alts_fn_init)
+          elif (user_input[1] == 'altb' or user_input[1] == 'altbackground'):
+            #avoid accessing the same ROOT file in multiple tnp_analyzers
+            self.mc_nom_tnp_analyzer.close_file()
+            self.data_altbkg_tnp_analyzer.close_file()
+            self.data_altbkg_tnp_analyzer.fit_histogram(starting_bin,
+                                                        starting_cat,
+                                                        self.altb_fn_name)
+          elif (user_input[1] == 'altsb' or 
+                user_input[1] == 'altsignalbackground'):
+            self.data_altsigbkg_tnp_analyzer.close_file()
+            self.data_altsigbkg_tnp_analyzer.fit_histogram(starting_bin,
+                                                           starting_cat,
+                                                           self.altsb_fn_name,
+                                                           self.alts_fn_init)
+          elif (user_input[1] == 'mc' or user_input[1] == 'mcalt'):
+            self.mc_nom_tnp_analyzer.close_file()
+            self.mc_nom_tnp_analyzer.fit_histogram(starting_bin,
+                                                   starting_cat,
+                                                   self.alts_fn_name_sa)
+          else:
+            print('ERROR: unrecognized argument to f(it)')
       elif (user_input[0] == 'o' or user_input[0] == 'output'):
         #TODO add calls to outputs for each individual piece
         self.generate_output()

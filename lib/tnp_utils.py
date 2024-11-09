@@ -36,7 +36,9 @@ CMS_COLORS = [ROOT.TColor.GetColor('#3f90da'),
               ROOT.TColor.GetColor('#e76300'), 
               ROOT.TColor.GetColor('#b9ac70'),
               ROOT.TColor.GetColor('#717581'), 
-              ROOT.TColor.GetColor('#92dadd')]
+              ROOT.TColor.GetColor('#92dadd'), #last official color
+              ROOT.TColor.GetColor('#964a8b'),
+              ROOT.TColor.GetColor('#e42536')]
 
 def clean_string(name):
   '''
