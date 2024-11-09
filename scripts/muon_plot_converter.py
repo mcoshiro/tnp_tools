@@ -19,7 +19,8 @@ if __name__=='__main__':
      description='script to convert from muon POG format to tnp_tools format')
   argument_parser.add_argument('-c','--clean',action='store_true')
   argument_parser.add_argument('-p','--parent_directory')
-  argument_parser.add_argument('-l','--leg',choices=['singlemu','dimu17','dimu8'])
+  argument_parser.add_argument('-t','--trigger',choices=['singlemu','dimu17',
+      'dimu8'])
   argument_parser.add_argument('-y','--year',choices=['2016APV','2016','2017',
       '2018','2022','2022EE','2023','2023BPix'])
   args = argument_parser.parse_args()
@@ -31,11 +32,11 @@ if __name__=='__main__':
   n_pt_bins = 12
   n_eta_bins = 4
 
-  if args.leg == 'dimu17':
+  if args.trigger == 'dimu17':
     tnp_basename = 'NUM_Mu17leg'
     trig_threshold = '17'
     n_pt_bins = 11
-  if args.leg == 'dimu8':
+  if args.trigger == 'dimu8':
     tnp_basename = 'NUM_Mu8leg'
     trig_threshold = '8'
     n_pt_bins = 11
@@ -44,12 +45,12 @@ if __name__=='__main__':
     pog_year = 'Run2016_UL'
   elif args.year == '2017':
     pog_year = 'Run2017_UL'
-    if args.leg == 'singlemu':
+    if args.trigger == 'singlemu':
       tnp_basename = 'NUM_IsoMu27'
       n_pt_bins = 11
   elif args.year=='2018':
     pog_year = 'Run2018_UL'
-    if args.leg == 'singlemu':
+    if args.trigger == 'singlemu':
       tnp_basename = 'NUM_IsoMu24'
 
   tnp_basename += '_DEN_HToZGamma_SignalMuons'
@@ -113,7 +114,7 @@ if __name__=='__main__':
           almc_hist = pog_almc_file.Get(pog_hist_name)
           almc_hist.SetDirectory(ROOT.nullptr)
           tnp_almc_file.WriteObject(almc_hist,tnp_hist_name)
-          ibin += 1
+        ibin += 1
     pog_data_file.Close()
     tnp_data_file.Close()
     pog_nmmc_file.Close()

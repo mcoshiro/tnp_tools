@@ -54,6 +54,22 @@ if __name__=='__main__':
                       file_path+'Run2016H_L1matched.root']
     mc_filenames = [file_path+'DY_NLO_L1matched.root']
     mcalt_filenames = [file_path+'DY_LO_L1matched.root']
+  if (year == '2017'):
+    file_path = '/eos/cms/store/group/phys_egamma/tnpTuples/tomc/2020-05-20/UL2017/merged/'
+    data_filenames = [file_path+'Run2017B.root',
+                      file_path+'Run2017C.root',
+                      file_path+'Run2017D.root',
+                      file_path+'Run2017E.root',
+                      file_path+'Run2017F.root']
+    mc_filenames = [file_path+'DY_NLO.root']
+    mcalt_filenames = [file_path+'DY_LO.root']
+    if args.trig=='singleel':
+      measurement_cut = 'passHltEle32DoubleEGWPTightGsf&&passEGL1SingleEGOr'
+      measurement_desc = 'HLT_Ele32_WPTight (emulated)'
+      analyzer_name = 'eltrig32'
+      pt_binning = [7.0,31.0,32.0,33.0,34.0,35.0,38.0,45.0,80.0,120.0,500.0]
+      eta_binning = [-2.5,-2.0,-1.5,-0.8,0.0,0.8,1.5,2.0,2.5]
+      gappt_binning = [7.0,32.0,45.0,500.0]
 
   analyzer_name = 'hzg_'+analyzer_name+'_'+year
   
