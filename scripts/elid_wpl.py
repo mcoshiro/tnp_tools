@@ -33,13 +33,21 @@ if __name__=='__main__':
                       file_path+'Run2016H_L1matched.root']
     mc_filenames = [file_path+'DY_NLO_L1matched.root']
     mcalt_filenames = [file_path+'DY_LO_L1matched.root']
-  if (year == '2017'):
+  elif (year == '2017'):
     file_path = '/eos/cms/store/group/phys_egamma/tnpTuples/tomc/2020-05-20/UL2017/merged/'
     data_filenames = [file_path+'Run2017B.root',
                       file_path+'Run2017C.root',
                       file_path+'Run2017D.root',
                       file_path+'Run2017E.root',
                       file_path+'Run2017F.root']
+    mc_filenames = [file_path+'DY_NLO.root']
+    mcalt_filenames = [file_path+'DY_LO.root']
+  elif (year == '2018'):
+    file_path = '/eos/cms/store/group/phys_egamma/tnpTuples/tomc/2020-05-20/UL2018/merged/'
+    data_filenames = [file_path+'Run2018A.root',
+                      file_path+'Run2018B.root',
+                      file_path+'Run2018C.root',
+                      file_path+'Run2018D.root']
     mc_filenames = [file_path+'DY_NLO.root']
     mcalt_filenames = [file_path+'DY_LO.root']
   
