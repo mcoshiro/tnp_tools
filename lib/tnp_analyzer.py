@@ -520,16 +520,40 @@ class TnpAnalyzer:
     filename  string, output filename
     '''
 
+    #load fit parameters and calculate efficiencies
+    pass_param_dict = dict()
+    fail_param_dict = dict()
+    pass_param_filename = 'out/{}/fitinfo_bin{}_pass.json'.format(
+        self.temp_name,ibin)
+    fail_param_filename = 'out/{}/fitinfo_bin{}_fail.json'.format(
+        self.temp_name,ibin)
+    with open(pass_param_filename,'r') as input_file:
+      pass_param_dict = json.loads(input_file.read())
+    with open(fail_param_filename,'r') as input_file:
+      fail_param_dict = json.loads(input_file.read())
+    nsig_pass = pass_param_dict['nSig']
+    nsig_fail = fail_param_dict['nSig']
+    nsig_pass_unc = pass_param_dict['nSig_unc']
+    nsig_fail_unc = fail_param_dict['nSig_unc']
+    nsig_total = nsig_pass+nsig_fail
+    nsig_total_unc = math.hypot(nsig_pass_unc, nsig_fail_unc)
+    eff = 0.0
+    unc = 1.0
+    if (nsig_pass > 0.0):
+      eff = nsig_pass/nsig_total
+      unc = eff*math.hypot(nsig_pass_unc/nsig_pass, nsig_total_unc/nsig_total)
+    else:
+      print('WARNING: no fit passing signal in bin '+str(ibin))
+
+    #if fragment already exists, just return efficiency
+    if os.path.exists(filename):
+      return (eff, unc)
+
     #draw fit to passing leg on middle subpad
     canvas = ROOT.TCanvas('can','can',3*320,320)
     canvas.Divide(3,1,0.0,0.0)
     canvas.cd(2)
     ROOT.gPad.SetMargin(0.1,0.1,0.1,0.1)
-    pass_param_dict = dict()
-    param_filename = 'out/'+self.temp_name+'/fitinfo_bin'+str(ibin)+'_pass.json'
-    hist_name = 'hist_pass_bin{}'.format(ibin)
-    with open(param_filename,'r') as input_file:
-      pass_param_dict = json.loads(input_file.read())
 
     #initialize workspace
     fit_range_lower = self.fit_var_range[0]
@@ -539,15 +563,18 @@ class TnpAnalyzer:
       fit_range_upper = self.custom_fit_range[1]
     fit_var_pass = ROOT.RooRealVar('fit_var', self.fit_var_name, 
                               fit_range_lower, fit_range_upper) 
-    pass_workspace = self.model_initializers[pass_param_dict['fit_model']](fit_var_pass, ibin, True)
-    data_pass = ROOT.RooDataHist('data','fit variable', ROOT.RooArgList(fit_var_pass), 
-                            self.temp_file.Get(hist_name))
+    pass_workspace = self.model_initializers[pass_param_dict['fit_model']](
+        fit_var_pass, ibin, True)
+    hist_name = 'hist_pass_bin{}'.format(ibin)
+    data_pass = ROOT.RooDataHist('data','fit variable', ROOT.RooArgList(
+        fit_var_pass),self.temp_file.Get(hist_name))
     getattr(pass_workspace,'import')(data_pass)
     for param_name in pass_param_dict:
       if ((not (param_name == 'fit_model' or param_name == 'fit_status')) and
           (not '_unc' in param_name)):
         pass_workspace.var(param_name).setVal(pass_param_dict[param_name])
-    pass_plot = pass_workspace.var('fit_var').frame(ROOT.RooFit.Title('Passing leg'))
+    pass_plot = pass_workspace.var('fit_var').frame(ROOT.RooFit.Title(
+        'Passing leg'))
     pass_workspace.data('data').plotOn(pass_plot, ROOT.RooFit.MarkerStyle(1))
     sig_norm_temp = pass_workspace.var('nSig').getValV()
     bak_norm_temp = pass_workspace.var('nBkg').getValV()
@@ -566,22 +593,20 @@ class TnpAnalyzer:
     #draw fit to failing leg on right subpad
     canvas.cd(3)
     ROOT.gPad.SetMargin(0.1,0.1,0.1,0.1)
-    fail_param_dict = dict()
-    param_filename = 'out/'+self.temp_name+'/fitinfo_bin'+str(ibin)+'_fail.json'
-    hist_name = 'hist_fail_bin{}'.format(ibin)
-    with open(param_filename,'r') as input_file:
-      fail_param_dict = json.loads(input_file.read())
     fit_var_fail = ROOT.RooRealVar('fit_var', self.fit_var_name, 
                               fit_range_lower, fit_range_upper) 
-    fail_workspace = self.model_initializers[fail_param_dict['fit_model']](fit_var_fail, ibin, False)
-    data_fail = ROOT.RooDataHist('data','fit variable', ROOT.RooArgList(fit_var_fail), 
-                            self.temp_file.Get(hist_name))
+    fail_workspace = self.model_initializers[fail_param_dict['fit_model']](
+        fit_var_fail, ibin, False)
+    hist_name = 'hist_fail_bin{}'.format(ibin)
+    data_fail = ROOT.RooDataHist('data','fit variable', ROOT.RooArgList(
+        fit_var_fail),self.temp_file.Get(hist_name))
     getattr(fail_workspace,'import')(data_fail)
     for param_name in fail_param_dict:
       if ((not (param_name == 'fit_model' or param_name == 'fit_status')) and
           (not '_unc' in param_name)):
         fail_workspace.var(param_name).setVal(fail_param_dict[param_name])
-    fail_plot = fail_workspace.var('fit_var').frame(ROOT.RooFit.Title('Failing leg'))
+    fail_plot = fail_workspace.var('fit_var').frame(ROOT.RooFit.Title(
+        'Failing leg'))
     fail_workspace.data('data').plotOn(fail_plot,ROOT.RooFit.MarkerStyle(1))
     sig_norm_temp = fail_workspace.var('nSig').getValV()
     bak_norm_temp = fail_workspace.var('nBkg').getValV()
@@ -599,19 +624,6 @@ class TnpAnalyzer:
 
     #write text on left subpad
     canvas.cd(1)
-    nsig_pass = pass_param_dict['nSig']
-    nsig_fail = fail_param_dict['nSig']
-    nsig_pass_unc = pass_param_dict['nSig_unc']
-    nsig_fail_unc = fail_param_dict['nSig_unc']
-    nsig_total = nsig_pass+nsig_fail
-    nsig_total_unc = math.hypot(nsig_pass_unc, nsig_fail_unc)
-    eff = 0.0
-    unc = 1.0
-    if (nsig_pass > 0.0):
-      eff = nsig_pass/nsig_total
-      unc = eff*math.hypot(nsig_pass_unc/nsig_pass, nsig_total_unc/nsig_total)
-    else:
-      print('WARNING: no fit passing signal in bin '+str(ibin))
     pad_text = self.bin_names[ibin]+'\n'
     pad_text += ('Fit status pass: {}\n'.format(pass_param_dict['fit_status']))
     pad_text += ('Fit status fail: {}\n'.format(fail_param_dict['fit_status']))
@@ -621,12 +633,14 @@ class TnpAnalyzer:
       if ((not (param_name == 'fit_model' or param_name == 'fit_status')) and
           (not '_unc' in param_name)):
         pad_text += ('{}P = {:.4f} #pm {:.4f}\n'.format(
-            param_name, pass_param_dict[param_name], pass_param_dict[param_name+'_unc']))
+            param_name, pass_param_dict[param_name], 
+            pass_param_dict[param_name+'_unc']))
     for param_name in fail_param_dict:
       if ((not (param_name == 'fit_model' or param_name == 'fit_status')) and
           (not '_unc' in param_name)):
         pad_text += ('{}F = {:.4f} #pm {:.4f}\n'.format(
-            param_name, fail_param_dict[param_name], fail_param_dict[param_name+'_unc']))
+            param_name, fail_param_dict[param_name], 
+            fail_param_dict[param_name+'_unc']))
     latex = ROOT.TLatex()
     latex.SetTextSize(0.025)
     write_multiline_latex(0.1,0.9,latex,pad_text)
@@ -641,6 +655,10 @@ class TnpAnalyzer:
       os.remove(plot_filename)
     if os.path.exists(effi_filename):
       os.remove(effi_filename)
+    for ibin in range(0,self.nbins):
+      fragment_name = 'out/'+self.temp_name+'/allfits_fragment'+str(ibin)+'.pdf'
+      if os.path.exists(fragment_name):
+        os.remove(fragment_name)
 
   def generate_final_output(self):
     '''

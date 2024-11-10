@@ -358,7 +358,7 @@ def add_signal_model_mcsmear(workspace, ibin, is_pass, get_histogram):
   '''
 
   fit_var = workspace.var('fit_var')
-  mean = ROOT.RooRealVar('mean', 'Smearing gaussian peak', -5.0, 5.0) 
+  mean = ROOT.RooRealVar('mean', 'Smearing gaussian peak', -10.0, 10.0) 
   sigma = ROOT.RooRealVar('sigma', 'Smearing gaussian sigma', 0.5, 5.0) 
   getattr(workspace,'import')(mean)
   getattr(workspace,'import')(sigma)
@@ -385,7 +385,7 @@ def add_signal_model_mcsumsmear(workspace, ibin, is_pass, get_histogram):
   '''
 
   fit_var = workspace.var('fit_var')
-  mean = ROOT.RooRealVar('mean', 'Smearing gaussian peak', -5.0, 5.0) 
+  mean = ROOT.RooRealVar('mean', 'Smearing gaussian peak', -10.0, 10.0) 
   sigma = ROOT.RooRealVar('sigma', 'Smearing gaussian sigma', 0.5, 5.0) 
   pass_frac = ROOT.RooRealVar('pass_frac', 'pass template coef', 0.0, 1.0)
   if (is_pass):
