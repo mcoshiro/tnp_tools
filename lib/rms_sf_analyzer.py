@@ -81,7 +81,7 @@ def param_initializer_dscbgaus_from_mc(ibin, is_pass, workspace, mc_analyzer):
     for var in ['mu','sigma','alphal','nl','alphar','nr','gauss_mu',
                 'gauss_sigma','gauss_frac']:
       workspace.var(var).setVal(param_dict[var])
-    for var in ['sigma','alphal','nl','alphar','nr','gauss_sigma',
+    for var in ['alphal','nl','alphar','nr','gauss_mu','gauss_sigma',
                 'gauss_frac']:
       workspace.var(var).setConstant()
 
@@ -117,6 +117,14 @@ def get_mc_histogram(ibin, is_pass, mc_analyzer, highpt_bins):
   hist_name = 'hist_{}_bin{}'.format(pass_fail,ibin)
   input_file = ROOT.TFile(mc_filename,'READ')
   hist = input_file.Get(hist_name)
+  #deal with rare case of empty histogram
+  if hist.Integral()<=0.0:
+    if pass_fail=='pass':
+      hist_name = 'hist_fail_bin{}'.format(ibin)
+      hist = input_file.Get(hist_name)
+    else:
+      hist_name = 'hist_pass_bin{}'.format(ibin)
+      hist = input_file.Get(hist_name)
   hist.SetDirectory(ROOT.nullptr)
   input_file.Close()
   return hist
@@ -146,7 +154,8 @@ def add_gap_eta_bins(original_bins):
   return (new_bins, neg_gap_location, pos_gap_location+1)
 
 def calculate_sfs(eff_dat1, eff_dat2, eff_dat3, eff_dat4, 
-                  eff_sim1, eff_sim2, unc_dat1, unc_sim1):
+                  eff_sim1, eff_sim2, unc_dat1, unc_sim1,
+                  unc_sim2):
   '''Calculates scale factors from efficiencies and associated uncertainties 
   using RMS method
 
@@ -158,6 +167,7 @@ def calculate_sfs(eff_dat1, eff_dat2, eff_dat3, eff_dat4,
   eff_sim2  simulation efficiency measurement 2
   unc_dat1  data efficiency 1 uncertainty
   unc_sim1  simulation efficiency 1 uncertainty
+  unc_sim2  simulation efficiency 2 uncertainty
 
   returns (scale factor for passing events,
            associated uncertainty,
@@ -180,8 +190,26 @@ def calculate_sfs(eff_dat1, eff_dat2, eff_dat3, eff_dat4,
     sfpmcalt = abs(sfp1-eff_dat1/eff_sim2)
     pass_sf = sfpm
     pass_unc = math.hypot(sfprms/math.sqrt(4.0),sfpdstat,max(sfpmstat,sfpmcalt))
+  elif (eff_sim1 > 0.0 or eff_sim2 > 0.0):
+    nonzero_eff_sim = eff_sim1
+    nonzero_unc_sim = unc_sim1
+    if eff_sim2 > 0.0:
+      nonzero_eff_sim = eff_sim2
+      nonzero_unc_sim = unc_sim2
+    sfp1 = eff_dat1/nonzero_eff_sim
+    sfp2 = eff_dat2/nonzero_eff_sim
+    sfp3 = eff_dat3/nonzero_eff_sim
+    sfp4 = eff_dat4/nonzero_eff_sim
+    sfpm = statistics.mean([sfp1,sfp2,sfp3,sfp4])
+    sfprms = math.hypot(sfp1-sfpm,sfp2-sfpm,sfp3-sfpm,sfp4-sfpm)/math.sqrt(3.0)
+    sfpdstat = sfp1*unc_dat1/eff_dat1
+    sfpmstat = sfp1*nonzero_unc_sim/nonzero_eff_sim
+    pass_sf = sfpm
+    pass_unc = math.hypot(sfprms/math.sqrt(4.0),sfpdstat,sfpmstat)
   else:
     print('WARNING: zero efficiency found')
+    print(eff_sim1)
+    print(eff_sim2)
 
   if not (eff_sim1>=1.0 or eff_sim2>=1.0):
     sff1 = (1.0-eff_dat1)/(1.0-eff_sim1)
@@ -195,6 +223,22 @@ def calculate_sfs(eff_dat1, eff_dat2, eff_dat3, eff_dat4,
     sffmcalt = abs(sff1-(1.0-eff_dat1)/(1.0-eff_sim2))
     fail_sf = sffm
     fail_unc = math.hypot(sffrms/math.sqrt(4.0),sffdstat,max(sffmstat,sffmcalt))
+  elif (eff_sim1 < 1.0 or eff_sim2 < 1.0):
+    nonunity_eff_sim = eff_sim1
+    nonunity_unc_sim = unc_sim1
+    if eff_sim2 < 1.0:
+      nonunity_eff_sim = eff_sim2
+      nonunity_unc_sim = unc_sim2
+    sff1 = (1.0-eff_dat1)/(1.0-nonunity_eff_sim)
+    sff2 = (1.0-eff_dat2)/(1.0-nonunity_eff_sim)
+    sff3 = (1.0-eff_dat3)/(1.0-nonunity_eff_sim)
+    sff4 = (1.0-eff_dat4)/(1.0-nonunity_eff_sim)
+    sffm = statistics.mean([sff1,sff2,sff3,sff4])
+    sffrms = math.hypot(sff1-sffm,sff2-sffm,sff3-sffm,sff4-sffm)/math.sqrt(3.0)
+    sffdstat = sff1*unc_dat1/(1.0-eff_dat1)
+    sffmstat = sff1*nonunity_unc_sim/(1.0-nonunity_eff_sim)
+    fail_sf = sffm
+    fail_unc = math.hypot(sffrms/math.sqrt(4.0),sffdstat,sffmstat)
   else:
     print('WARNING: unity efficiency found')
   return pass_sf, pass_unc, fail_sf, fail_unc
@@ -566,6 +610,8 @@ class RmsSFAnalyzer:
     nom_signal_model_name = 'mc'
     nom_background_model = add_background_model_bernstein
     nom_background_model_name = 'bern'
+    contingency_background_model = add_background_model_bernstein8
+    contingency_background_model_name = 'bern8'
     alt_signal_model = add_signal_model_dscbgaus
     alt_signal_model_standalone = model_initializer_dscbgaus
     alt_signal_model_initializer = partial(param_initializer_dscbgaus_from_mc,
@@ -576,8 +622,12 @@ class RmsSFAnalyzer:
 
     self.nom_fn_name = '{}_{}'.format(nom_signal_model_name, 
                                       nom_background_model_name)
+    self.contingency_fn_name = '{}_{}'.format(nom_signal_model_name, 
+                                              contingency_background_model_name)
     self.alts_fn_name = '{}_{}'.format(alt_signal_model_name, 
                                        nom_background_model_name)
+    self.contingencyalts_fn_name = '{}_{}'.format(alt_signal_model_name, 
+        contingency_background_model_name)
     self.altb_fn_name = '{}_{}'.format(nom_signal_model_name, 
                                        alt_background_model_name)
     self.altsb_fn_name = '{}_{}'.format(alt_signal_model_name, 
@@ -589,10 +639,18 @@ class RmsSFAnalyzer:
         partial(make_signal_background_model, 
             add_signal_model = nom_signal_model,
             add_background_model = nom_background_model))
+    self.data_nom_tnp_analyzer.add_model(self.contingency_fn_name,
+        partial(make_signal_background_model, 
+            add_signal_model = nom_signal_model,
+            add_background_model = contingency_background_model))
     self.data_altsig_tnp_analyzer.add_model(self.alts_fn_name,
         partial(make_signal_background_model, 
             add_signal_model = alt_signal_model,
             add_background_model = nom_background_model))
+    self.data_altsig_tnp_analyzer.add_model(self.contingencyalts_fn_name,
+        partial(make_signal_background_model, 
+            add_signal_model = alt_signal_model,
+            add_background_model = contingency_background_model))
     self.data_altbkg_tnp_analyzer.add_model(self.altb_fn_name,
         partial(make_signal_background_model, 
             add_signal_model = nom_signal_model,
@@ -733,9 +791,10 @@ class RmsSFAnalyzer:
       eff_dat3 = eff_alt_bkg[ibin][0]
       eff_dat4 = eff_alt_snb[ibin][0]
       eff_sim1 = eff_sim_nom[ibin][0]
-      eff_sim2 = eff_sim_nom[ibin][0]
+      eff_sim2 = eff_sim_alt[ibin][0]
       unc_dat1 = eff_dat_nom[ibin][1]
       unc_sim1 = eff_sim_nom[ibin][1]
+      unc_sim2 = eff_sim_alt[ibin][1]
 
       eff_dat_mean = statistics.mean((eff_dat1, eff_dat2, eff_dat3, eff_dat4))
       eff_dat_unc = math.hypot(unc_dat1, math.hypot((eff_dat1-eff_dat_mean),
@@ -744,10 +803,15 @@ class RmsSFAnalyzer:
       data_eff.append(eff_dat_mean)
       data_unc.append(eff_dat_unc)
       
-      mc_eff.append(eff_sim1)
-      mc_unc.append(max(unc_sim1,abs(eff_sim1-eff_sim2)))
+      if (eff_sim1>0.0 and eff_sim1<1.0):
+        mc_eff.append(eff_sim1)
+        mc_unc.append(max(unc_sim1,abs(eff_sim1-eff_sim2)))
+      else:
+        mc_eff.append(eff_sim2)
+        mc_unc.append(max(unc_sim2,abs(eff_sim1-eff_sim2)))
       sfs = calculate_sfs(eff_dat1, eff_dat2, eff_dat3, eff_dat4, 
-                          eff_sim1, eff_sim2, unc_dat1, unc_sim1)
+                          eff_sim1, eff_sim2, unc_dat1, unc_sim1,
+                          unc_sim2)
       pass_sf.append(sfs[0])
       pass_unc.append(sfs[1])
       fail_sf.append(sfs[2])
@@ -1335,12 +1399,22 @@ class RmsSFAnalyzer:
             self.data_nom_tnp_analyzer.close_file()
             self.data_nom_tnp_analyzer.fit_histogram(starting_bin,starting_cat,
                                                      self.nom_fn_name)
+          elif (user_input[1] == 'nomcont'):
+            #avoid accessing the same ROOT file in multiple tnp_analyzers
+            self.mc_nom_tnp_analyzer.close_file()
+            self.data_nom_tnp_analyzer.close_file()
+            self.data_nom_tnp_analyzer.fit_histogram(starting_bin,starting_cat,
+                                                     self.contingency_fn_name)
           elif (user_input[1] == 'alts' or user_input[1] == 'altsignal'):
             self.data_altsig_tnp_analyzer.close_file()
             self.data_altsig_tnp_analyzer.fit_histogram(starting_bin,
                                                         starting_cat,
                                                         self.alts_fn_name,
                                                         self.alts_fn_init)
+          elif (user_input[1] == 'altscont'):
+            self.data_altsig_tnp_analyzer.close_file()
+            self.data_altsig_tnp_analyzer.fit_histogram(starting_bin,
+                starting_cat,self.contingencyalts_fn_name,self.alts_fn_init)
           elif (user_input[1] == 'altb' or user_input[1] == 'altbackground'):
             #avoid accessing the same ROOT file in multiple tnp_analyzers
             self.mc_nom_tnp_analyzer.close_file()
