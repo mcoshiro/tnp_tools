@@ -689,7 +689,7 @@ class RmsSFAnalyzer:
     os.mkdir('out/'+altsig_name)
     os.mkdir('out/'+altbkg_name)
     os.mkdir('out/'+altsnb_name)
-    self.data_nom_tnp_analyzer.temp_file.Close()
+    self.data_nom_tnp_analyzer.close_file()
     os.system('cp out/'+nomdat_name+'/'+nomdat_name+'.root '
               +'out/'+altsig_name+'/'+altsig_name+'.root')
     os.system('cp out/'+nomdat_name+'/'+nomdat_name+'.root '
@@ -698,6 +698,8 @@ class RmsSFAnalyzer:
               +'out/'+altsnb_name+'/'+altsnb_name+'.root')
     self.mc_nom_tnp_analyzer.produce_histograms()
     self.mc_alt_tnp_analyzer.produce_histograms()
+    self.mc_nom_tnp_analyzer.close_file()
+    self.mc_alt_tnp_analyzer.close_file()
 
   def clean_output(self):
     '''Cleans the output so efficiencies will be regenerated
