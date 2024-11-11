@@ -6,6 +6,7 @@ T&P meta analyzer that follows standard EGM procedures to generate scale factors
 from array import array
 from correctionlib import schemav2 
 from functools import partial
+import gc
 import os
 import ROOT
 import statistics
@@ -1082,6 +1083,8 @@ class RmsSFAnalyzer:
     failunc_string = 'Fail SF Unc. '+self.data_nom_tnp_analyzer.measurement_desc
     for fit_syst in ['data_nom','data_altsig','data_altbkg','data_altsigbkg','mc_nom']:
       os.system('cp out/{0}_{1}/allfits.pdf out/{0}/{1}_allfits.pdf'.format(self.name,fit_syst))
+    gc.collect()
+    gc.disable()
     make_data_mc_graph(eta_plot_x, eta_plot_ex, eff_eta_plot_data_y, 
                        eff_eta_plot_data_ey, eff_eta_plot_mc_y, 
                        eff_eta_plot_mc_ey, 
@@ -1134,6 +1137,7 @@ class RmsSFAnalyzer:
                  'out/{0}/{0}_sffail_unc.pdf'.format(self.name), '|#eta|', 
                  'p_{T} [GeV]', failunc_string, LUMI_TAGS[self.year], False, 
                  True)
+    gc.enable()
 
   def generate_summary_plots_gap(self, data_eff, data_unc, mc_eff, mc_unc, 
                                  pass_sf, pass_unc, fail_sf, fail_unc):
@@ -1288,6 +1292,8 @@ class RmsSFAnalyzer:
     failunc_string = 'Fail SF Unc. '+self.data_nom_tnp_analyzer.measurement_desc
     for fit_syst in ['data_nom','data_altsig','data_altbkg','data_altsigbkg','mc_nom']:
       os.system('cp out/{0}_{1}/allfits.pdf out/{0}/{1}_allfits.pdf'.format(self.name,fit_syst))
+    gc.collect()
+    gc.disable()
     make_data_mc_graph(eta_plot_x, eta_plot_ex, eff_eta_plot_data_y, 
                        eff_eta_plot_data_ey, eff_eta_plot_mc_y, 
                        eff_eta_plot_mc_ey, 
@@ -1354,6 +1360,7 @@ class RmsSFAnalyzer:
                  'out/{0}/{0}_sffail_unc.pdf'.format(self.name), '#eta', 
                  'p_{T} [GeV]', failunc_string, LUMI_TAGS[self.year], False, 
                  True)
+    gc.enable()
 
   def run_interactive(self):
     '''
