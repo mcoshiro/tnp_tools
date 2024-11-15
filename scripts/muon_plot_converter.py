@@ -20,13 +20,14 @@ if __name__=='__main__':
   argument_parser.add_argument('-c','--clean',action='store_true')
   argument_parser.add_argument('-p','--parent_directory')
   argument_parser.add_argument('-t','--trigger',choices=['singlemu','dimu17',
-      'dimu8'])
+      'dimu8','id'])
   argument_parser.add_argument('-y','--year',choices=['2016APV','2016','2017',
       '2018','2022','2022EE','2023','2023BPix'])
   args = argument_parser.parse_args()
 
   #set up constants
   pog_year = 'Run2016_UL_HIPM'
+  pog_subyear = pog_year
   tnp_basename = 'NUM_IsoMu24_or_IsoTkMu24'
   trig_threshold = '24'
   n_pt_bins = 12
@@ -40,33 +41,68 @@ if __name__=='__main__':
     tnp_basename = 'NUM_Mu8leg'
     trig_threshold = '8'
     n_pt_bins = 11
+  if args.trigger == 'id':
+    tnp_basename = 'NUM_HtoZZID_DEN_TrackerMuons'
+    trig_threshold = '8'
+    n_pt_bins = 10
 
   if args.year == '2016':
     pog_year = 'Run2016_UL'
+    pog_subyear = pog_year
   elif args.year == '2017':
     pog_year = 'Run2017_UL'
+    pog_subyear = pog_year
     if args.trigger == 'singlemu':
       trig_threshold = '27'
       tnp_basename = 'NUM_IsoMu27'
       n_pt_bins = 11
   elif args.year=='2018':
     pog_year = 'Run2018_UL'
+    pog_subyear = pog_year
+    if args.trigger == 'singlemu':
+      tnp_basename = 'NUM_IsoMu24'
+  elif args.year=='2022':
+    pog_year = 'Run2022'
+    pog_subyear = pog_year
+    if args.trigger == 'singlemu':
+      tnp_basename = 'NUM_IsoMu24'
+  elif args.year=='2022EE':
+    pog_year = 'Run2022_EE'
+    pog_subyear = pog_year
+    if args.trigger == 'singlemu':
+      tnp_basename = 'NUM_IsoMu24'
+  elif args.year=='2023':
+    pog_year = 'Run2023'
+    pog_subyear = 'Run2023C'
+    if args.trigger == 'singlemu':
+      tnp_basename = 'NUM_IsoMu24'
+  elif args.year=='2023BPix':
+    pog_year = 'Run2023_BPix'
+    pog_subyear = 'Run2023D'
     if args.trigger == 'singlemu':
       tnp_basename = 'NUM_IsoMu24'
 
-  tnp_basename += '_DEN_HToZGamma_SignalMuons'
+  if args.trigger != 'id':
+    tnp_basename += '_DEN_HToZGamma_SignalMuons'
   pog_filename = tnp_basename+'_abseta_pt.root'
 
-  pog_data_filename = ('{0}/flat/muon/generalTracks/Z/{1}/{1}/Nominal/{2}'
-      .format(args.parent_directory,pog_year,pog_filename))
+  pog_data_filename = ('{0}/flat/muon/generalTracks/Z/{1}/{2}/Nominal/{3}'
+      .format(args.parent_directory,pog_year,pog_subyear,pog_filename))
   pog_nmmc_filename = (('{0}/flat/muon/generalTracks/Z/{1}/DY_madgraph/'
       +'Nominal/{2}').format(args.parent_directory,pog_year,
       pog_filename))
   pog_almc_filename = (('{0}/flat/muon/generalTracks/Z/{1}/DY_MassBinned/'
       +'Nominal/{2}').format(args.parent_directory,pog_year,
       pog_filename))
+  if (args.year=='2022' or args.year=='2022EE' or args.year=='2023'
+      or args.year=='2023BPix'):
+    pog_almc_filename = (('{0}/flat/muon/generalTracks/Z/{1}/DY_amcatnlo/'
+        +'Nominal/{2}').format(args.parent_directory,pog_year,
+        pog_filename))
 
   out_name = 'hzg_mutrig{}_{}'.format(trig_threshold,args.year)
+  if args.trigger == 'id':
+    out_name = 'hzg_muid_{}'.format(args.year)
   tnp_data_filename = 'out/{0}_data_nom/{0}_data_nom.root'.format(out_name)
   tnp_dtas_filename = 'out/{0}_data_altsig/{0}_data_altsig.root'.format(
       out_name)
