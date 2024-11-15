@@ -10,7 +10,8 @@ if __name__=='__main__':
   argument_parser = ArgumentParser(prog='elid',
       description='Driver script for electron ID SF measurment.')
   argument_parser.add_argument('-y','--year',choices=['2016APV','2016',
-      '2017','2018','2022','2022EE','2023','2023BPix'],default='2016APV')
+      '2017','2018','2022','2022EE','2023','2023BPix','2023BPixHole'],
+      default='2016APV')
   args = argument_parser.parse_args()
 
   #default: 2016APV
@@ -50,6 +51,10 @@ if __name__=='__main__':
                       file_path+'Run2018D.root']
     mc_filenames = [file_path+'DY_NLO.root']
     mcalt_filenames = [file_path+'DY_LO.root']
+  elif (year == '2023BPix'):
+    preselection += '&&!(el_eta>-1.5&&el_eta<0.0&&el_phi>-1.2&&el_phi<-0.8)'
+  elif (year == '2023BPixHole'):
+    preselection += '&&(el_eta>-1.5&&el_eta<0.0&&el_phi>-1.2&&el_phi<-0.8)'
   
   elid_analyzer = RmsSFAnalyzer('hzg_elid_{}'.format(year))
   elid_analyzer.year = year
@@ -58,8 +63,12 @@ if __name__=='__main__':
   elid_analyzer.set_fitting_variable('pair_mass','m_{ee} [GeV]')
   elid_analyzer.set_measurement_variable(measurement_cut,measurement_desc)
   elid_analyzer.set_preselection(preselection,preselection,preselection)
-  elid_analyzer.add_standard_gap_binning([7.0,15.0,20.0,35.0,50.0,100.0,500.0],
-      [-2.5,-2.0,-1.5,-0.8,0.0,0.8,1.5,2.0,2.5],[7.0,35.0,500.0],'el_pt',
-      'el_sc_eta')
+  if (year != '2023BPixHole'):
+    elid_analyzer.add_standard_gap_binning([7.0,15.0,20.0,35.0,50.0,100.0,500.0],
+        [-2.5,-2.0,-1.5,-0.8,0.0,0.8,1.5,2.0,2.5],[7.0,35.0,500.0],'el_pt',
+        'el_sc_eta')
+  else:
+    eltrig_analyzer.add_standard_binning([7.0,15.0,20.0,35.0,50.0,100.0,500.0],
+        [-1.566,-1.4442,-0.8,0.0],'el_pt','el_sc_eta')
   elid_analyzer.run_interactive()
 

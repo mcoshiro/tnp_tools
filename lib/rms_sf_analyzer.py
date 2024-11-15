@@ -209,8 +209,18 @@ def calculate_sfs(eff_dat1, eff_dat2, eff_dat3, eff_dat4,
     pass_unc = math.hypot(sfprms/math.sqrt(4.0),sfpdstat,sfpmstat)
   else:
     print('WARNING: zero efficiency found')
-    print(eff_sim1)
-    print(eff_sim2)
+    nonzero_eff_sim = unc_sim1
+    nonzero_unc_sim = unc_sim1
+    sfp1 = eff_dat1/nonzero_eff_sim
+    sfp2 = eff_dat2/nonzero_eff_sim
+    sfp3 = eff_dat3/nonzero_eff_sim
+    sfp4 = eff_dat4/nonzero_eff_sim
+    sfpm = statistics.mean([sfp1,sfp2,sfp3,sfp4])
+    sfprms = math.hypot(sfp1-sfpm,sfp2-sfpm,sfp3-sfpm,sfp4-sfpm)/math.sqrt(3.0)
+    sfpdstat = sfp1*unc_dat1/eff_dat1
+    sfpmstat = sfp1*nonzero_unc_sim/nonzero_eff_sim
+    pass_sf = sfpm
+    pass_unc = math.hypot(sfprms/math.sqrt(4.0),sfpdstat,sfpmstat)
 
   if not (eff_sim1>=1.0 or eff_sim2>=1.0):
     sff1 = (1.0-eff_dat1)/(1.0-eff_sim1)

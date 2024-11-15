@@ -729,6 +729,7 @@ class TnpAnalyzer:
         unc = eff*math.hypot(npass_unc/npass, ntotal_unc/ntotal)
       else:
         print('WARNING: no passing signal in bin '+str(ibin))
+        unc = 1.5/ntotal
       effs.append([eff,unc])
     with open(effi_filename,'w') as output_file:
       output_file.write(json.dumps(effs))

@@ -85,6 +85,10 @@ if __name__=='__main__':
       pt_binning = [7.0,31.0,32.0,33.0,34.0,35.0,38.0,45.0,80.0,120.0,500.0]
       eta_binning = [-2.5,-2.0,-1.5,-0.8,0.0,0.8,1.5,2.0,2.5]
       gappt_binning = [7.0,32.0,45.0,500.0]
+  elif (year == '2023BPix'):
+    preselection += '&&!(el_eta>-1.5&&el_eta<0.0&&el_phi>-1.2&&el_phi<-0.8)'
+  elif (year == '2023BPixHole'):
+    preselection += '&&(el_eta>-1.5&&el_eta<0.0&&el_phi>-1.2&&el_phi<-0.8)'
 
   analyzer_name = 'hzg_'+analyzer_name+'_'+year
   
@@ -94,7 +98,11 @@ if __name__=='__main__':
   eltrig_analyzer.set_fitting_variable('pair_mass','m_{ee} [GeV]')
   eltrig_analyzer.set_measurement_variable(measurement_cut,measurement_desc)
   eltrig_analyzer.set_preselection(preselection,preselection,preselection)
-  eltrig_analyzer.add_standard_gap_binning(pt_binning,eta_binning,
-                                           gappt_binning,'el_pt','el_sc_eta')
+  if (year != '2023BPixHole'):
+    eltrig_analyzer.add_standard_gap_binning(pt_binning,eta_binning,
+                                             gappt_binning,'el_pt','el_sc_eta')
+  else:
+    eltrig_analyzer.add_standard_binning(pt_binning,[-1.566,-1.4442,-0.8,0.0],
+                                         'el_pt','el_sc_eta')
   eltrig_analyzer.run_interactive()
 
