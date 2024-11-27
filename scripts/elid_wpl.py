@@ -81,8 +81,16 @@ if __name__=='__main__':
     preselection = 'tag_Ele_pt>30&&tag_Ele_abseta<2.17&&(tag_Ele_q+el_q)==0'
 
   elif (year == '2023BPix'):
+    file_path = '/eos/cms/store/group/phys_egamma/ec/tnpTuples/Prompt2023/'
+    data_filenames = [file_path+'data_2023D.root']
+    mc_filenames = [file_path+'DY_NLO_2023postBPIX.root']
+    mcalt_filenames = [file_path+'DY_LO_2023postBPIX.root']
     preselection += '&&!(el_eta>-1.5&&el_eta<0.0&&el_phi>-1.2&&el_phi<-0.8)'
   elif (year == '2023BPixHole'):
+    file_path = '/eos/cms/store/group/phys_egamma/ec/tnpTuples/Prompt2023/'
+    data_filenames = [file_path+'data_2023D.root']
+    mc_filenames = [file_path+'DY_NLO_2023postBPIX.root']
+    mcalt_filenames = [file_path+'DY_LO_2023postBPIX.root']
     preselection += '&&(el_eta>-1.5&&el_eta<0.0&&el_phi>-1.2&&el_phi<-0.8)'
 
   preselection_mc = preselection + '&&(mcTrue==1)'

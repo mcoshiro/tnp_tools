@@ -86,9 +86,31 @@ if __name__=='__main__':
       eta_binning = [-2.5,-2.0,-1.5,-0.8,0.0,0.8,1.5,2.0,2.5]
       gappt_binning = [7.0,32.0,45.0,500.0]
   elif (year == '2023BPix'):
+    file_path = '/eos/cms/store/group/phys_egamma/ec/tnpTuples/Prompt2023/'
+    data_filenames = [file_path+'data_2023D.root']
+    mc_filenames = [file_path+'DY_NLO_2023postBPIX.root']
+    mcalt_filenames = [file_path+'DY_LO_2023postBPIX.root']
     preselection += '&&!(el_eta>-1.5&&el_eta<0.0&&el_phi>-1.2&&el_phi<-0.8)'
+    if args.trig=='singleel':
+      measurement_cut = 'passHltEle30WPTightGsf'
+      measurement_desc = 'HLT_Ele30_WPTight'
+      analyzer_name = 'eltrig30'
+      pt_binning = [7.0,29.0,30.0,31.0,32.0,35.0,38.0,45.0,80.0,120.0,500.0]
+      eta_binning = [-2.5,-2.0,-1.5,-0.8,0.0,0.8,1.5,2.0,2.5]
+      gappt_binning = [7.0,32.0,45.0,500.0]
   elif (year == '2023BPixHole'):
+    file_path = '/eos/cms/store/group/phys_egamma/ec/tnpTuples/Prompt2023/'
+    data_filenames = [file_path+'data_2023D.root']
+    mc_filenames = [file_path+'DY_NLO_2023postBPIX.root']
+    mcalt_filenames = [file_path+'DY_LO_2023postBPIX.root']
     preselection += '&&(el_eta>-1.5&&el_eta<0.0&&el_phi>-1.2&&el_phi<-0.8)'
+    if args.trig=='singleel':
+      measurement_cut = 'passHltEle30WPTightGsf'
+      measurement_desc = 'HLT_Ele30_WPTight'
+      analyzer_name = 'eltrig30'
+      pt_binning = [7.0,29.0,30.0,31.0,32.0,35.0,38.0,45.0,80.0,120.0,500.0]
+      eta_binning = [-2.5,-2.0,-1.5,-0.8,0.0,0.8,1.5,2.0,2.5]
+      gappt_binning = [7.0,32.0,45.0,500.0]
 
   analyzer_name = 'hzg_'+analyzer_name+'_'+year
   preselection_mc = preselection + '&&(mcTrue==1)'
