@@ -46,6 +46,24 @@ int get_probe_photon_idx(RVec<float> photon_pt, RVec<bool> photon_isScEtaEB,
   return idx;
 }
 
+int get_probe_photon_idx_mc(RVec<float> photon_pt, RVec<bool> photon_isScEtaEB,
+                            RVec<bool> photon_isScEtaEE, RVec<float> photon_drmin,
+                            RVec<int> photon_pflavor) {
+  int idx = -1;
+  float max_pt = -999;
+  for (unsigned iph = 0; iph < photon_pt.size(); iph++) {
+    float pt = photon_pt[iph];
+    if (pt > 15.0 && (photon_isScEtaEB[iph] || photon_isScEtaEE[iph])
+        && photon_drmin[iph] > 0.3 && photon_pflavor[iph]==1) {
+      if (pt > max_pt) {
+        idx = static_cast<int>(iph);
+        max_pt = pt;
+      }
+    }
+  }
+  return idx;
+}
+
 float get_mllg(RVec<float> ll_pt, RVec<float> ll_eta, RVec<float> ll_phi, 
                RVec<float> ll_m, RVec<float> photon_pt, RVec<float> photon_eta,
                RVec<float> photon_phi, int probe_ph_idx) {
@@ -71,6 +89,7 @@ if __name__=='__main__':
       description='Converts NanoAOD to TnP n-tuple')
   argument_parser.add_argument('-i','--input_filename')
   argument_parser.add_argument('-o','--output_filename')
+  argument_parser.add_argument('-m','--mc',action='store_true')
   args = argument_parser.parse_args()
 
   year = get_year(args.input_filename)
@@ -80,8 +99,13 @@ if __name__=='__main__':
   df = df.Filter('nmu==2&nll>=1')
   df = df.Filter('(trig_single_mu&&mu_pt[0]>28)'
                  +'||(trig_double_mu&&mu_pt[0]>20&&mu_pt[1]>10)')
-  df = df.Define('probe_ph_idx','get_probe_photon_idx(photon_pt,'
-                 +'photon_isScEtaEB,photon_isScEtaEE,photon_drmin)')
+  if args.mc:
+    df = df.Define('probe_ph_idx','get_probe_photon_idx_mc(photon_pt,'
+                   +'photon_isScEtaEB,photon_isScEtaEE,photon_drmin,'
+                   +'photon_pflavor)')
+  else:
+    df = df.Define('probe_ph_idx','get_probe_photon_idx(photon_pt,'
+                   +'photon_isScEtaEB,photon_isScEtaEE,photon_drmin)')
   df = df.Filter('probe_ph_idx != -1')
   df = df.Define('probe_ph_pt','photon_pt[probe_ph_idx]')
   df = df.Define('probe_ph_eta','photon_eta[probe_ph_idx]')

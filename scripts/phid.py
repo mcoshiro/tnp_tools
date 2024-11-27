@@ -29,7 +29,7 @@ if __name__=='__main__':
     mc_filenames = ['/data2/oshiro/ntuples/2018/phwp80skim_dyg.root']
     mcalt_filenames = ['/data2/oshiro/ntuples/2018/phwp80skim_dyg2.root']
   #pt_binning = [15.0,20.0]
-  pt_binning = [20.0,35.0,50.0,80.0] #just for validation with EGM SFs
+  pt_binning = [15.0,20.0,35.0,50.0,80.0] #just for validation with EGM SFs
   eta_binning = [-2.5,-2.0,-1.5,-0.8,0.0,0.8,1.5,2.0,2.5]
 
   analyzer_name = 'hzg_phid_'+year
