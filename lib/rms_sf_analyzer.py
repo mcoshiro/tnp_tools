@@ -607,9 +607,10 @@ class RmsSFAnalyzer:
     self.eta_bins = eta_bins
     self.gap_pt_bins = gap_pt_bins
 
-  def add_models(self):
+  def add_models(self,gamma_add_gauss=False):
     '''
     Adds standard models and parameter initializers for fitting
+    gamma_add_gauss  bool, use extra gaussian for background model
     '''
     #this makes liberal use of functools.partial in order to 
     # 1. merge signal and background models
@@ -630,6 +631,9 @@ class RmsSFAnalyzer:
     alt_signal_model_name = 'dscbgaus'
     alt_background_model = add_background_model_gamma
     alt_background_model_name = 'gamma'
+    if gamma_add_gauss:
+      alt_background_model = add_background_model_gammagauss
+      alt_background_model_name = 'gammagauss'
 
     self.nom_fn_name = '{}_{}'.format(nom_signal_model_name, 
                                       nom_background_model_name)
@@ -1372,11 +1376,11 @@ class RmsSFAnalyzer:
                  True)
     gc.enable()
 
-  def run_interactive(self):
+  def run_interactive(self, gamma_add_gauss=False):
     '''
     Run an interactive T&P analysis
     '''
-    self.add_models()
+    self.add_models(gamma_add_gauss)
 
     #run main interactive loop
     exit_loop = False

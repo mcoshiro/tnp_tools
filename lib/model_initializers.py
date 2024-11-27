@@ -763,3 +763,37 @@ def add_background_model_gamma(workspace, ibin, is_pass):
   pdf_b = ROOT.RooGamma('pdf_b', 'pdf_b', fit_var, gamma, beta, gamma_mu)
   getattr(workspace,'import')(pdf_b)
 
+def add_background_model_gammagauss(workspace, ibin, is_pass):
+  '''Adds gamma+gauss distribution as background model
+
+  workspace    workspace to add model to; must have variable fit_var
+  ibin         int bin number
+  is_pass      bool, indicates if passing or failing leg
+  '''
+  fit_var = workspace.var('fit_var')
+  gamma = ROOT.RooRealVar('gamma', 'RooGamma gamma', 0.01, 20.0)
+  beta = ROOT.RooRealVar('beta', 'RooGamma beta', 0.5, 100.0)
+  gamma_mu = ROOT.RooRealVar('gamma_mu', 'RooGamma mu', 0.0, 60.0)
+  gamadd_mu = ROOT.RooRealVar('gamadd_mu', 'RooGaussian mu', 40.0, 140.0)
+  gamadd_sigma = ROOT.RooRealVar('gamadd_sigma', 'RooGaussian sigma', 0.5, 60.0)
+  gamadd_frac = ROOT.RooRealVar('gamadd_frac', 'Gaussian frac', 0.0, 1.0)
+  gamma.setVal(18.0)
+  beta.setVal(4.0)
+  gamma_mu.setVal(55.0)
+  gamadd_mu.setVal(65.0)
+  gamadd_sigma.setVal(7.0)
+  gamadd_frac.setVal(0.34)
+  getattr(workspace,'import')(gamma)
+  getattr(workspace,'import')(beta)
+  getattr(workspace,'import')(gamma_mu)
+  getattr(workspace,'import')(gamadd_mu)
+  getattr(workspace,'import')(gamadd_sigma)
+  getattr(workspace,'import')(gamadd_frac)
+  pdf_b_gamma = ROOT.RooGamma('pdf_b_gamma', 'pdf_b_gamma', fit_var, gamma, 
+                              beta, gamma_mu)
+  pdf_b_gauss = ROOT.RooGaussian('pdf_b_gauss', 'pdf_b_gauss', fit_var, 
+                              gamadd_mu, gamadd_sigma)
+  pdf_b = ROOT.RooAddPdf('pdf_b','pdf_b',
+                          ROOT.RooArgList(pdf_b_gauss, pdf_b_gamma), 
+                          ROOT.RooArgList(gamadd_frac))
+  getattr(workspace,'import')(pdf_b)
