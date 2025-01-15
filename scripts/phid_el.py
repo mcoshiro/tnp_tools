@@ -25,6 +25,7 @@ if __name__=='__main__':
   measurement_cut = ('passingMVA94XV2wp80')
   measurement_desc = 'Photon ID WP80'
   preselection = 'tag_Ele_pt>40&&tag_Ele_abseta<2.17&&((ph_sc_abseta<1.4442)||(ph_sc_abseta>.1566&&ph_sc_abseta<2.5))'
+  preselection_mc = 'tag_Ele_pt>40&&tag_Ele_abseta<2.17&&((ph_sc_abseta<1.4442)||(ph_sc_abseta>.1566&&ph_sc_abseta<2.5))&&mcTrue==1'
   year = args.year
   if (year == '2016'):
     file_path = '/eos/cms/store/group/phys_egamma/tnpTuples/rasharma/2021-02-10/UL2016postVFP/merged/'
@@ -61,7 +62,9 @@ if __name__=='__main__':
                                 'tnpPhoIDs/fitter_tree')
   elid_analyzer.set_fitting_variable('pair_mass','m_{e#gamma} [GeV]')
   elid_analyzer.set_measurement_variable(measurement_cut,measurement_desc)
-  elid_analyzer.set_preselection(preselection,preselection,preselection)
+  elid_analyzer.set_preselection(preselection,preselection_mc,preselection)
+  elid_analyzer.mc_nom_tnp_analyzer.fit_var_weight = 'totWeight'
+  elid_analyzer.mc_alt_tnp_analyzer.fit_var_weight = 'totWeight'
   elid_analyzer.add_standard_binning([15.0,20.0,35.0,50.0,80.0],
       [-2.5,-2.0,-1.5,-0.8,0.0,0.8,1.5,2.0,2.5],'ph_et',
       'ph_sc_eta')
