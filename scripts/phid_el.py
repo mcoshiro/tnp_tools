@@ -62,7 +62,7 @@ if __name__=='__main__':
   elid_analyzer.set_fitting_variable('pair_mass','m_{e#gamma} [GeV]')
   elid_analyzer.set_measurement_variable(measurement_cut,measurement_desc)
   elid_analyzer.set_preselection(preselection,preselection,preselection)
-  elid_analyzer.add_standard_binning([20.0,35.0,50.0,80.0],
+  elid_analyzer.add_standard_binning([15.0,20.0,35.0,50.0,80.0],
       [-2.5,-2.0,-1.5,-0.8,0.0,0.8,1.5,2.0,2.5],'ph_et',
       'ph_sc_eta')
   elid_analyzer.run_interactive()

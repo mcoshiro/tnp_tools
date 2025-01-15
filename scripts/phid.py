@@ -41,6 +41,8 @@ if __name__=='__main__':
                                 'tree')
   phid_analyzer.set_fitting_variable('pair_mass','m_{#mu#mu#gamma} [GeV]')
   phid_analyzer.set_measurement_variable(measurement_cut,measurement_desc)
+  phid_analyzer.mc_nom_tnp_analyzer.fit_var_weight = 'w_lumiyearpu'
+  phid_analyzer.mc_alt_tnp_analyzer.fit_var_weight = 'w_lumiyearpu'
   phid_analyzer.set_preselection(preselection,preselection,preselection)
   phid_analyzer.add_standard_binning(pt_binning,eta_binning,
                                      'probe_ph_pt','probe_ph_eta')

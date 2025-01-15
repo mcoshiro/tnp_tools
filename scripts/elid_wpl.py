@@ -84,14 +84,17 @@ if __name__=='__main__':
     preselection += '&&!(el_eta>-1.5&&el_eta<0.0&&el_phi>-1.2&&el_phi<-0.8)'
   elif (year == '2023BPixHole'):
     preselection += '&&(el_eta>-1.5&&el_eta<0.0&&el_phi>-1.2&&el_phi<-0.8)'
+
+  preselection_mc = preselection + '&&(mcTrue==1)'
   
   elid_analyzer = RmsSFAnalyzer('hzg_elid_{}'.format(year))
   elid_analyzer.year = year
   elid_analyzer.set_input_files(data_filenames,mc_filenames,mcalt_filenames,
                                 'tnpEleIDs/fitter_tree')
-  elid_analyzer.set_fitting_variable('pair_mass','m_{ee} [GeV]')
+  elid_analyzer.set_fitting_variable('pair_mass','m_{ee} [GeV]',
+                                     weight_mc='totWeight')
   elid_analyzer.set_measurement_variable(measurement_cut,measurement_desc)
-  elid_analyzer.set_preselection(preselection,preselection,preselection)
+  elid_analyzer.set_preselection(preselection,preselection_mc,preselection)
   if (year != '2023BPixHole'):
     elid_analyzer.add_standard_gap_binning([7.0,15.0,20.0,35.0,50.0,100.0,500.0],
         [-2.5,-2.0,-1.5,-0.8,0.0,0.8,1.5,2.0,2.5],[7.0,35.0,500.0],'el_pt',

@@ -91,13 +91,15 @@ if __name__=='__main__':
     preselection += '&&(el_eta>-1.5&&el_eta<0.0&&el_phi>-1.2&&el_phi<-0.8)'
 
   analyzer_name = 'hzg_'+analyzer_name+'_'+year
+  preselection_mc = preselection + '&&(mcTrue==1)'
   
   eltrig_analyzer = RmsSFAnalyzer(analyzer_name)
   eltrig_analyzer.year = year
   eltrig_analyzer.set_input_files(data_filenames,mc_filenames,mcalt_filenames,'tnpEleTrig/fitter_tree')
-  eltrig_analyzer.set_fitting_variable('pair_mass','m_{ee} [GeV]')
+  eltrig_analyzer.set_fitting_variable('pair_mass','m_{ee} [GeV]',
+                                       weight_mc='totWeight')
   eltrig_analyzer.set_measurement_variable(measurement_cut,measurement_desc)
-  eltrig_analyzer.set_preselection(preselection,preselection,preselection)
+  eltrig_analyzer.set_preselection(preselection,preselection_mc,preselection)
   if (year != '2023BPixHole'):
     eltrig_analyzer.add_standard_gap_binning(pt_binning,eta_binning,
                                              gappt_binning,'el_pt','el_sc_eta')

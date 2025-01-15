@@ -442,7 +442,9 @@ class RmsSFAnalyzer:
     self.mc_alt_tnp_analyzer.set_input_files(mc_alt_files, mc_alt_tree)
     
   def set_fitting_variable(self, name, description, nbins=60, nbins_mc=80,
-                           var_range=(60.0,120.0), custom_mc_range=(50.0,130.0), weight='1'):
+                           var_range=(60.0,120.0), 
+                           custom_mc_range=(50.0,130.0), weight='1', 
+                           weight_mc='1'):
     '''
     Adds information about fitting variable
 
@@ -453,6 +455,7 @@ class RmsSFAnalyzer:
     custom_mc_range  tuple of two floats, start and end of MC histogram range
                      (may be different from var_range for convolutions)
     weight           string, expression for weight to use
+    weight_mc        string, expression for weight to use for MC
     '''
     self.data_nom_tnp_analyzer.set_fitting_variable(name, description, nbins, 
                                                     var_range, weight)
@@ -464,9 +467,9 @@ class RmsSFAnalyzer:
                                                           nbins, var_range, 
                                                           weight)
     self.mc_nom_tnp_analyzer.set_fitting_variable(name, description, nbins_mc, 
-                                                  custom_mc_range, weight)
+                                                  custom_mc_range, weight_mc)
     self.mc_alt_tnp_analyzer.set_fitting_variable(name, description, nbins_mc, 
-                                                  custom_mc_range, weight)
+                                                  custom_mc_range, weight_mc)
     self.mc_nom_tnp_analyzer.set_custom_fit_range(var_range)
     self.mc_alt_tnp_analyzer.set_custom_fit_range(var_range)
 
