@@ -10,6 +10,7 @@ import gc
 import os
 import ROOT
 import statistics
+import subprocess
 import json
 
 from tnp_analyzer import *
@@ -17,15 +18,19 @@ from tnp_utils import CMS_COLORS, LUMI_TAGS
 from model_initializers import *
 from root_plot_lib import RplPlot
 
-def param_initializer_dscb_from_mc(ibin, is_pass, workspace, mc_analyzer):
-  '''
-  Parameter initializer for cheby_dscb model that fixes DSCB parameters except
-  mean and sigma to MC result
+def param_initializer_dscb_from_mc(ibin: int, is_pass: bool, 
+                                   workspace: ROOT.RooWorkspace, 
+                                   mc_analyzer: TnpAnalyzer):
+  '''Parameter initializer for DSCB based on MC fit
+
+  Parameter initializer for cheby_dscb model that fixes DSCB parameters 
+  except mean and sigma to MC result
   
-  ibin         int, bin number
-  is_pass      bool, indicates if passing leg
-  workspace    RooWorkspace for this bin
-  mc_analyzer  TnpAnalyzer for MC samples
+  Args:
+    ibin: bin number
+    is_pass: indicates if passing leg
+    workspace: RooWorkspace for this bin
+    mc_analyzer: TnpAnalyzer for MC samples
   '''
   pass_fail = 'pass'
   if not is_pass:
@@ -39,15 +44,19 @@ def param_initializer_dscb_from_mc(ibin, is_pass, workspace, mc_analyzer):
     for var in ['alphal','nl','alphar','nr']:
       workspace.var(var).setConstant()
 
-def param_initializer_moddscb_from_mc(ibin, is_pass, workspace, mc_analyzer):
-  '''
+def param_initializer_moddscb_from_mc(ibin: int, is_pass: bool, 
+                                      workspace: ROOT.RooWorkspace, 
+                                      mc_analyzer: TnpAnalyzer):
+  '''Parameter initializer for Cheby+DSCB based on MC fit
+
   Parameter initializer for cheby_dscb model that fixes DSCB parameters except
   mean and sigma to MC result
   
-  ibin         int, bin number
-  is_pass      bool, indicates if passing leg
-  workspace    RooWorkspace for this bin
-  mc_analyzer  TnpAnalyzer for MC samples
+  Args:
+    ibin: bin number
+    is_pass: indicates if passing leg
+    workspace: RooWorkspace for this bin
+    mc_analyzer: TnpAnalyzer for MC samples
   '''
   pass_fail = 'pass'
   if not is_pass:
@@ -62,15 +71,19 @@ def param_initializer_moddscb_from_mc(ibin, is_pass, workspace, mc_analyzer):
     for var in ['alphal','nl1','nl2','fl','alphar','nr1','nr2','fr']:
       workspace.var(var).setConstant()
 
-def param_initializer_dscbgaus_from_mc(ibin, is_pass, workspace, mc_analyzer):
-  '''
+def param_initializer_dscbgaus_from_mc(ibin: int, is_pass: bool, 
+                                       workspace: ROOT.RooWorkspace, 
+                                       mc_analyzer: TnpAnalyzer):
+  '''Parameter initializer for Cheby and DSCB+Gauss based on MC fit
+
   Parameter initializer for cheby_dscb model that fixes DSCB parameters except
   mean and sigma to MC result
   
-  ibin         int, bin number
-  is_pass      bool, indicates if passing leg
-  workspace    RooWorkspace for this bin
-  mc_analyzer  TnpAnalyzer for MC samples
+  Args:
+    ibin: bin number
+    is_pass: indicates if passing leg
+    workspace: RooWorkspace for this bin
+    mc_analyzer: TnpAnalyzer for MC samples
   '''
   pass_fail = 'pass'
   if not is_pass:
@@ -86,15 +99,19 @@ def param_initializer_dscbgaus_from_mc(ibin, is_pass, workspace, mc_analyzer):
                 'gauss_frac']:
       workspace.var(var).setConstant()
 
-def param_initializer_cbconvgen_from_mc(ibin, is_pass, workspace, mc_analyzer):
-  '''
+def param_initializer_cbconvgen_from_mc(ibin: int, is_pass: bool, 
+                                        workspace: ROOT.RooWorkspace, 
+                                        mc_analyzer: TnpAnalyzer):
+  '''Parameter initializer for CB * template parameters to MC fit
+
   Parameter initializer for cbconvgen model that fixes CB parameters to MC
   result
   
-  ibin         int, bin number
-  is_pass      bool, indicates if passing leg
-  workspace    RooWorkspace for this bin
-  mc_analyzer  TnpAnalyzer for MC samples
+  Args:
+    ibin: bin number
+    is_pass: indicates if passing leg
+    workspace: RooWorkspace for this bin
+    mc_analyzer: TnpAnalyzer for MC samples
   '''
   pass_fail = 'pass'
   if not is_pass:
@@ -108,8 +125,18 @@ def param_initializer_cbconvgen_from_mc(ibin, is_pass, workspace, mc_analyzer):
     for var in ['alpha','n','sigma_2','tailLeft']:
       workspace.var(var).setConstant()
 
-def get_mc_histogram(ibin, is_pass, mc_analyzer, highpt_bins):
-  '''Helper function used to get appropriate TH1D from analyzer
+def get_mc_histogram(ibin: int, is_pass: bool, mc_analyzer: TnpAnalyzer, 
+                     highpt_bins: list[int]) -> ROOT.TH1D:
+  '''Helper function used to get appropriate histogram from analyzer
+
+  Args:
+    ibin: bin index
+    is_pass: indicates if passing leg
+    mc_analyzer: TnpAnalyzer to extract histogram from
+    highpt_bins: list of high pt bins where the failing leg is ignored
+
+  Returns:
+    specified histogram
   '''
   pass_fail = 'pass'
   if not is_pass and not (ibin in highpt_bins):
@@ -130,13 +157,17 @@ def get_mc_histogram(ibin, is_pass, mc_analyzer, highpt_bins):
   input_file.Close()
   return hist
 
-def add_gap_eta_bins(original_bins):
-  '''
-  Modifies eta binning to include EB-EE gap bins (-1.566,-1.4442) and 
-  (1.4442,1.566). Returns a tuple (new_bins, -gap_index, +gap_index)
+def add_gap_eta_bins(original_bins: list[float]) -> tuple[list[float],int,int]:
+  '''Modifies binning to include gap bins
 
-  original_bins   sorted list of floats, must have an entry in the ranges
-                  specified above
+  Modifies eta binning to include EB-EE gap bins (-1.566,-1.4442) and 
+  (1.4442,1.566). Original_bins MUST include -1.5 and 1.5
+
+  Args:
+    original_bins: ordered bin edges
+
+  Returns: 
+    (new_bins, -gap_index, +gap_index)
   '''
   new_bins = original_bins.copy()
   neg_gap_location = -1
@@ -154,26 +185,28 @@ def add_gap_eta_bins(original_bins):
   new_bins[pos_gap_location+2] = 1.566
   return (new_bins, neg_gap_location, pos_gap_location+1)
 
-def calculate_sfs(eff_dat1, eff_dat2, eff_dat3, eff_dat4, 
-                  eff_sim1, eff_sim2, unc_dat1, unc_sim1,
-                  unc_sim2):
-  '''Calculates scale factors from efficiencies and associated uncertainties 
-  using RMS method
+def calculate_sfs(eff_dat1: float, eff_dat2: float, eff_dat3: float, 
+                  eff_dat4: float, eff_sim1: float, eff_sim2: float, 
+                  unc_dat1: float, unc_sim1: float, 
+                  unc_sim2: float) -> tuple[float,float,float,float]:
+  '''Computes SFs factors from efficiencies and uncertainties using RMS method
 
-  eff_dat1  data efficiency measurement 1
-  eff_dat2  data efficiency measurement 2
-  eff_dat3  data efficiency measurement 3
-  eff_dat4  data efficiency measurement 4
-  eff_sim1  simulation efficiency measurement 1
-  eff_sim2  simulation efficiency measurement 2
-  unc_dat1  data efficiency 1 uncertainty
-  unc_sim1  simulation efficiency 1 uncertainty
-  unc_sim2  simulation efficiency 2 uncertainty
+  Args:
+    eff_dat1: data efficiency measurement 1
+    eff_dat2: data efficiency measurement 2
+    eff_dat3: data efficiency measurement 3
+    eff_dat4: data efficiency measurement 4
+    eff_sim1: simulation efficiency measurement 1
+    eff_sim2: simulation efficiency measurement 2
+    unc_dat1: data efficiency 1 uncertainty
+    unc_sim1: simulation efficiency 1 uncertainty
+    unc_sim2: simulation efficiency 2 uncertainty
 
-  returns (scale factor for passing events,
-           associated uncertainty,
-           scale factor for failing events,
-           associated uncertainty)
+  Returns:
+    (scale factor for passing events,
+     associated uncertainty,
+     scale factor for failing events,
+     associated uncertainty)
   '''
   pass_sf = 1.0
   pass_unc = 1.0
@@ -254,26 +287,33 @@ def calculate_sfs(eff_dat1, eff_dat2, eff_dat3, eff_dat4,
     print('WARNING: unity efficiency found')
   return pass_sf, pass_unc, fail_sf, fail_unc
 
-def make_data_mc_graph(x, ex, data_y, data_ey, sim_y, sim_ey, name, data_names, 
-                       mc_names, x_title, y_title, lumi, log_x=False):
-  '''
+def make_data_mc_graph(x: list[float], ex: list[float], 
+                       data_y: list[list[float]], data_ey: list[list[float]], 
+                       sim_y: list[list[float]], sim_ey: list[list[float]], 
+                       name: str, data_names: list[float], 
+                       mc_names: list[str], x_title: str, 
+                       y_title: str, lumi: tuple[float, float], 
+                       log_x: bool=False):
+  '''Generate Data-MC comparison plot
+
   Makes a nice plot with multiple graphs overlayed. Each data graph will be
   drawn in solid line while each simulation graph in dotted lines. The number
   of y/ey points should match
 
-  x           list of floats, x values for points
-  ex          list of floats, x error bars for points
-  data_y      list of list of floats, y values for data points
-  data_ey     list of list of floats, y error bars for data points
-  sim_y       list of list of floats, y values for simulation points
-  sim_ey      list of list of floats, y error bars for simulation points
-  name        string filename
-  data_names  list of string names for data graphs
-  mc_names    list of string names for mc graphs
-  x_title     X-axis label
-  y_title     y-axis label
-  lumi        list of tuple of two floats representing lumi and CM energy
-  log_x       bool, if true makes x-axis logarithmic
+  Args:
+    x: x values for points
+    ex: x error bars for points
+    data_y: y values for data points
+    data_ey: y error bars for data points
+    sim_y: y values for simulation points
+    sim_ey: y error bars for simulation points
+    name: filename
+    data_names: names for data graphs
+    mc_names: names for mc graphs
+    x_title: X-axis label
+    y_title: y-axis label
+    lumi: lumi and CM energy
+    log_x: if true, makes x-axis logarithmic
   '''
   ROOT.gStyle.SetOptStat(0)
   x_vals = array('d',x)
@@ -308,14 +348,17 @@ def make_data_mc_graph(x, ex, data_y, data_ey, sim_y, sim_ey, name, data_names,
   sf_plot.log_x = log_x
   sf_plot.draw(name)
 
-def make_correction(name, desc, pt_bins, eta_bins, content):
-  '''generates correctionlib correction object
+def make_correction(name: str, desc: str, pt_bins: list[float], 
+                    eta_bins: list[float], 
+                    content: list[float]) -> schemav2.Correction:
+  '''Generates correctionlib correction object
 
-  name     string correction name
-  desc     string correction description
-  pt_bins  list of floats, bin edges
-  eta_bins list of floats, bin edges
-  content  list of floats, content
+  Args:
+    name: correction name
+    desc: description
+    pt_bins: bin edges
+    eta_bins: bin edges
+    content: content
   '''
   return schemav2.Correction(
       name=name,
@@ -332,21 +375,23 @@ def make_correction(name, desc, pt_bins, eta_bins, content):
           ),
       )
 
-def make_sf_graph(x, ex, y, ey, name, graph_names, x_title, y_title, lumi,
-                  log_x=False):
-  '''
-  Makes a nice plot with multiple graphs overlayed. 
+def make_sf_graph(x: list[float], ex: list[float], y: list[list[float]], 
+                  ey: list[list[float]], name: str, graph_names: list[str], 
+                  x_title: str, y_title: str, 
+                  lumi: list[tuple[float, float]], log_x: bool=False):
+  '''Makes a nice plot with multiple graphs overlayed. 
 
-  x           list of floats, x values for points
-  ex          list of floats, x error bars for points
-  y           list of list of floats, y values  for points
-  ey          list of list of floats, y error bars for points
-  name        string filename
-  graph_names list of string names for graphs
-  x_title     X-axis label
-  y_title     y-axis label
-  lumi        list of tuple of two floats representing lumi and CM energy
-  log_x       boolean, if true sets x-axis to be logarithmic
+  Args:
+    x: x values for points
+    ex: x error bars for points
+    y: y values  for points
+    ey: y error bars for points
+    name: filename
+    graph_names: names for graphs
+    x_title: X-axis label
+    y_title: y-axis label
+    lumi: list of tuple of two floats representing lumi and CM energy
+    log_x: if true sets x-axis to be logarithmic
   '''
   ROOT.gStyle.SetOptStat(0)
   x_vals = array('d',x)
@@ -370,20 +415,23 @@ def make_sf_graph(x, ex, y, ey, name, graph_names, x_title, y_title, lumi,
   sf_plot.log_x = log_x
   sf_plot.draw(name)
 
-def make_heatmap(x, y, z, name, x_title, y_title, z_title, lumi, log_x=False, log_y=False):
-  '''
-  Makes a heatmap (2D histogram/colz)
+def make_heatmap(x: list[float], y: list[float], z: list[float], name: str, 
+                 x_title: str, y_title: str, z_title: str, 
+                 lumi: list[tuple[float,float]], log_x: bool=False, 
+                 log_y: bool=False):
+  '''Makes a heatmap (2D histogram/colz)
 
-  x           list of floats, x axis bin divisions
-  y           list of floats, y axis bin divisions
-  z           list of floats, heatmap values
-  name        string filename
-  x_title     X-axis label
-  y_title     y-axis label
-  z_title     z-axis label
-  lumi        list of tuple of two floats representing lumi and CM energy
-  log_x       boolean, if true sets x-axis to be logarithmic
-  log_y       boolean, if true sets y-axis to be logarithmic
+  Args:
+    x: x axis bin divisions
+    y: y axis bin divisions
+    z: heatmap values
+    name: filename
+    x_title: x-axis label
+    y_title: y-axis label
+    z_title: z-axis label
+    lumi: list of tuple of two floats representing lumi and CM energy
+    log_x: if true sets x-axis to be logarithmic
+    log_y: if true sets y-axis to be logarithmic
   '''
   x_bins = array('d',x)
   y_bins = array('d',y)
@@ -400,12 +448,37 @@ def make_heatmap(x, y, z, name, x_title, y_title, z_title, lumi, log_x=False, lo
   sf_plot.draw(name)
 
 class RmsSFAnalyzer:
+  '''Class that manages RMS SF/efficiency derivation
 
-  def __init__(self, name):
-    '''
-    Constructor
+  Attributes:
+    name: analyzer name
+    data_nom_tnp_analyzer: analyzer for nominal data efficiencies
+    data_altsig_tnp_analyzer: analyzer for alt sig data efficiencies
+    data_altbkg_tnp_analyzer: analyzer for alt bkg data efficiencies
+    data_altsigbkg_tnp_analyzer: analyzer for alt sig+bkg data efficiencies
+    mc_nom_tnp_analyzer: analyzer for nominal MC efficiencies
+    mc_alt_tnp_analyzer: analyzer for alternative MC efficiencies
+    binning_type: 'std', 'std_gap', or 'custom' to indicate binning
+    year: data taking era
+    pt_bins: pt bin edges
+    eta_bins: eta bin edges
+    gap_pt_bins: pt bin edges for the gap region
+    highpt_bins: list of bins considered high-pt
+    nom_fn_name: name of nominal fit function
+    contingency_fn_name: name of nominal fit function used in contingency
+    alts_fn_name: name of alternate signal fit function
+    contingencyalts_fn_name: name of alternate signal fit function for cont.
+    altb_fn_name: name of alternate background fit function
+    altsb_fn_name: name of alternate signal+background fit function
+    alts_fn_init: initializer for alternate signal fit function
+    alts_fn_name_sa: name of alternate signal fit function without background
+  '''
 
-    name  string, name of analyzer
+  def __init__(self, name: str):
+    '''Constructor
+
+    Args:
+      name: name of analyzer
     '''
     ROOT.EnableImplicitMT()
     self.name = name
@@ -418,17 +491,31 @@ class RmsSFAnalyzer:
     self.binning_type = 'custom'
     self.year = '2016APV'
 
-  def set_input_files(self, data_files, mc_files, mc_alt_files, data_tree, 
-                      mc_tree='', mc_alt_tree=''):
-    '''
-    Sets input files
+    self.pt_bins = []
+    self.eta_bins = []
+    self.gap_pt_bins = []
+    self.highpt_bins = []
+    self.nom_fn_name = ''
+    self.contingency_fn_name = ''
+    self.alts_fn_name = ''
+    self.contingencyalts_fn_name = ''
+    self.altb_fn_name = ''
+    self.altsb_fn_name = ''
+    self.alts_fn_init = ''
+    self.alts_fn_name_sa = ''
 
-    data_files    list of strings, data files to process
-    mc_files      list of strings, mc files to process
-    mc_alt_files  list of strings, alternative MC files to process
-    data_tree     string, name of TTree in data files
-    mc_tree       string, name of TTree in MC files, defaults to data_tree if ''
-    mc_alt_tree   string, name of TTree in MC alt file, defaults to mc_tree if ''
+  def set_input_files(self, data_files: list[str], mc_files: list[str], 
+                      mc_alt_files: list[str], data_tree: str, 
+                      mc_tree: str='', mc_alt_tree: str=''):
+    '''Sets input files
+
+    Args:
+      data_files: data files to process
+      mc_files: mc files to process
+      mc_alt_files: alternative MC files to process
+      data_tree: name of TTree in data files
+      mc_tree: name of TTree in MC files, defaults to data_tree if ''
+      mc_alt_tree: name of TTree in MC alt file, defaults to mc_tree if ''
     '''
     if mc_tree=='':
       mc_tree = data_tree
@@ -441,21 +528,22 @@ class RmsSFAnalyzer:
     self.mc_nom_tnp_analyzer.set_input_files(mc_files, mc_tree)
     self.mc_alt_tnp_analyzer.set_input_files(mc_alt_files, mc_alt_tree)
     
-  def set_fitting_variable(self, name, description, nbins=60, nbins_mc=80,
-                           var_range=(60.0,120.0), 
-                           custom_mc_range=(50.0,130.0), weight='1', 
-                           weight_mc='1'):
-    '''
-    Adds information about fitting variable
+  def set_fitting_variable(self, name: str, description: str, nbins: int=60, 
+                           nbins_mc: int=80,
+                           var_range: tuple[float,float]=(60.0,120.0), 
+                           custom_mc_range: tuple[float,float]=(50.0,130.0), 
+                           weight: str='1', 
+                           weight_mc: str='1'):
+    '''Adds information about fitting variable
 
-    name             string, name of branch in TTree or C++ expression
-    description      string, name used in plots (with TLaTeX)
-    nbins            int, number of bins to use for fit variable
-    var_range        tuple of two floats, start and end of fit range
-    custom_mc_range  tuple of two floats, start and end of MC histogram range
-                     (may be different from var_range for convolutions)
-    weight           string, expression for weight to use
-    weight_mc        string, expression for weight to use for MC
+    Args:
+      name: name of branch in TTree or C++ expression
+      description: name used in plots (with TLaTeX)
+      nbins: number of bins to use for fit variable
+      var_range: start and end of fit range
+      custom_mc_range: start and end of MC histogram range
+      weight: expression for weight to use
+      weight_mc: expression for weight to use for MC
     '''
     self.data_nom_tnp_analyzer.set_fitting_variable(name, description, nbins, 
                                                     var_range, weight)
@@ -473,12 +561,12 @@ class RmsSFAnalyzer:
     self.mc_nom_tnp_analyzer.set_custom_fit_range(var_range)
     self.mc_alt_tnp_analyzer.set_custom_fit_range(var_range)
 
-  def set_measurement_variable(self, var, desc=''):
-    '''
-    Sets selection efficiency to measure with tag & probe
+  def set_measurement_variable(self, var: str, desc: str=''):
+    '''Sets selection efficiency to measure with tag & probe
 
-    var   string, name of branch in TTree or C++ expression
-    desc  string, description o fmeasurement variable
+    Args:
+      var: name of branch in TTree or C++ expression
+      desc: description o fmeasurement variable
     '''
     self.data_nom_tnp_analyzer.set_measurement_variable(var,desc)
     self.data_altsig_tnp_analyzer.set_measurement_variable(var,desc)
@@ -487,13 +575,14 @@ class RmsSFAnalyzer:
     self.mc_nom_tnp_analyzer.set_measurement_variable(var,desc)
     self.mc_alt_tnp_analyzer.set_measurement_variable(var,desc)
 
-  def set_preselection(self, preselection_data, preselection_mc, desc):
-    '''
-    Sets basic preselection applied to all bins
+  def set_preselection(self, preselection_data: str, preselection_mc: str, 
+                       desc: str):
+    '''Sets basic preselection applied to all bins
 
-    preselection_data  string, selection for data as a C++ expression
-    preselection_mc    string, selection for MC as a C++ expression
-    desc               string, description of selection in TLaTeX
+    Args:
+      preselection_data: selection for data as a C++ expression
+      preselection_mc: selection for MC as a C++ expression
+      desc: description of selection in TLaTeX
     '''
     self.data_nom_tnp_analyzer.set_preselection(preselection_data, desc)
     self.data_altsig_tnp_analyzer.set_preselection(preselection_data, desc)
@@ -515,18 +604,20 @@ class RmsSFAnalyzer:
   #  self.mc_nom_tnp_analyzer.add_nd_binning(dimensions)
   #  self.mc_alt_tnp_analyzer.add_nd_binning(dimensions)
 
-  def add_custom_binning(self, bin_selections, bin_names, is_high_pt):
-    '''
-    Creates custom bins for TnP analysis
+  def add_custom_binning(self, bin_selections: list[str], 
+                         bin_names: list[str], is_high_pt: list[bool]):
+    '''Creates custom bins for TnP analysis
 
-    bin_selections  list of strings, describes selection for each bin
-    bin_names       list of strings, names of each bin that appear in plots
-    is_high_pt      list of bools, indicates whether each bin is high pT
+    Args:
+      bin_selections: describes selection for each bin
+      bin_names: names of each bin that appear in plots
+      is_high_pt: indicates whether each bin is high pT
     '''
     self.data_nom_tnp_analyzer.add_custom_binning(bin_selections, bin_names)
     self.data_altsig_tnp_analyzer.add_custom_binning(bin_selections, bin_names)
     self.data_altbkg_tnp_analyzer.add_custom_binning(bin_selections, bin_names)
-    self.data_altsigbkg_tnp_analyzer.add_custom_binning(bin_selections, bin_names)
+    self.data_altsigbkg_tnp_analyzer.add_custom_binning(bin_selections, 
+                                                        bin_names)
     self.mc_nom_tnp_analyzer.add_custom_binning(bin_selections, bin_names)
     self.mc_alt_tnp_analyzer.add_custom_binning(bin_selections, bin_names)
     self.highpt_bins = []
@@ -534,14 +625,15 @@ class RmsSFAnalyzer:
       if is_high_pt[ibin]:
         self.highpt_bins.append(ibin)
 
-  def add_standard_binning(self, pt_bins, eta_bins, pt_var_name, eta_var_name):
-    '''
-    Creates standard pt-eta binning 
+  def add_standard_binning(self, pt_bins: list[float], eta_bins: list[float], 
+                           pt_var_name: str, eta_var_name: str):
+    '''Creates standard pt-eta binning 
 
-    pt_bins       list of floats, pt bin edges
-    eta_bins      list of floats, eta bin edges
-    pt_var_name   string, name of pt variable
-    eta_var_name  string, name of eta variable
+    Args:
+      pt_bins: pt bin edges
+      eta_bins: eta bin edges
+      pt_var_name: name of pt variable
+      eta_var_name: name of eta variable
     '''
     bin_selections = []
     bin_names = []
@@ -563,15 +655,18 @@ class RmsSFAnalyzer:
     self.eta_bins = eta_bins
     self.gap_pt_bins = []
 
-  def add_standard_gap_binning(self, pt_bins, eta_bins, gap_pt_bins, pt_var_name, eta_var_name):
-    '''
-    Creates standard binning including specialized pt bins for gap region
+  def add_standard_gap_binning(self, pt_bins: list[float], 
+                               eta_bins: list[float], 
+                               gap_pt_bins: list[float], pt_var_name: str, 
+                               eta_var_name: str):
+    '''Creates standard binning including specialized pt bins for gap region
 
-    pt_bins       list of floats, pt bin edges
-    eta_bins      list of floats, eta bin edges
-    gap_pt_bins   list of floats, gap region pt bin edges
-    pt_var_name   string, name of pt variable
-    eta_var_name  string, name of eta variable
+    Args:
+      pt_bins: pt bin edges
+      eta_bins: eta bin edges
+      gap_pt_bins: gap region pt bin edges
+      pt_var_name: name of pt variable
+      eta_var_name: name of eta variable
     '''
     bin_selections = []
     bin_names = []
@@ -610,10 +705,11 @@ class RmsSFAnalyzer:
     self.eta_bins = eta_bins
     self.gap_pt_bins = gap_pt_bins
 
-  def add_models(self,gamma_add_gauss=False):
-    '''
-    Adds standard models and parameter initializers for fitting
-    gamma_add_gauss  bool, use extra gaussian for background model
+  def add_models(self, gamma_add_gauss: bool=False):
+    '''Adds standard models and parameter initializers for fitting
+
+    Args:
+      gamma_add_gauss: use extra gaussian for background model
     '''
     #this makes liberal use of functools.partial in order to 
     # 1. merge signal and background models
@@ -685,8 +781,7 @@ class RmsSFAnalyzer:
         alt_signal_model_initializer)
 
   def produce_histograms(self):
-    '''
-    Produce histograms. Only performs one loop over data files for efficiency
+    '''Produce histograms. Performs one loop over data files for efficiency
     '''
     if not os.path.isdir('out'):
       os.mkdir('out')
@@ -729,8 +824,10 @@ class RmsSFAnalyzer:
 
   def generate_individual_outputs(self):
     '''Generates individual efficiency measurements if they have not already 
-    been generated and checks output files are generated correctly. Returns
-    true if the outputs are generated correctly
+    been generated and checks output files are generated correctly
+
+    Returns:
+      true if the outputs are generated correctly
     '''
     nomdat_name = self.name+'_data_nom'
     altsig_name = self.name+'_data_altsig'
@@ -747,7 +844,8 @@ class RmsSFAnalyzer:
     if not os.path.isfile('out/'+altsnb_name+'/efficiencies.json'):
       self.data_altsigbkg_tnp_analyzer.generate_final_output()
     if not os.path.isfile('out/'+nomsim_name+'/efficiencies.json'):
-      self.mc_nom_tnp_analyzer.generate_final_output() #just for fit plots
+      #just for fit plots
+      self.mc_nom_tnp_analyzer.generate_final_output() 
     if not os.path.isfile('out/'+nomsim_name+'/cnc_efficiencies.json'):
       self.mc_nom_tnp_analyzer.generate_cut_and_count_output()
     if not os.path.isfile('out/'+altsim_name+'/cnc_efficiencies.json'):
@@ -763,12 +861,73 @@ class RmsSFAnalyzer:
       return False
     return True
 
-  def generate_output(self):
+  def generate_web_output(self):
+    '''Generates webpage that summarizes output
+    '''
+    #do checks
+    sf_filename = 'out/{0}/{0}_scalefactors.json'.format(self.name)
+    if not os.path.exists(sf_filename):
+      print('ERROR: general output must be created before web output')
+      return
+    if os.path.isdir('out/web_{0}'.format(self.name)):
+      print('ERROR: web output already exists, aborting')
+      return
+
+    #generate plots
+    webdir = 'out/web_{0}'.format(self.name)
+    os.mkdir(webdir)
+    self.data_nom_tnp_analyzer.generate_web_output(webdir)
+    self.data_altsig_tnp_analyzer.generate_web_output(webdir)
+    self.data_altbkg_tnp_analyzer.generate_web_output(webdir)
+    self.data_altsigbkg_tnp_analyzer.generate_web_output(webdir)
+    self.mc_nom_tnp_analyzer.generate_web_output(webdir)
+    self.generate_output(True)
+    plot_types = ['eff_data','eff_mc','eff_ptbinned','eff_etabinned','sfpass',
+                  'sfpass_unc','sfpass_ptbinned','sfpass_etabinned','sffail',
+                  'sffail_unc','sffail_ptbinned','sffail_etabinned']
+    for plot_type in plot_types:
+      subprocess.run(('mv out/{0}/{0}_{1}.png out/web_{0}/'.format(self.name,
+                      plot_type)).split())
+
+    nbins = self.data_nom_tnp_analyzer.nbins
+
+    #setup web page/directory
+    with open('data/index_template.html','r') as template_file:
+      index_content = template_file.read()
+    index_content = index_content.replace('{0}',self.name)
+    with open('{0}/index.html'.format(webdir),'w') as webindex_file:
+      webindex_file.write(index_content)
+    with open('{0}/fits.html'.format(webdir),'w') as fits_file:
+      fits_file.write('<!DOCTYPE html>\n<html>\n<head>\n')
+      fits_file.write('<link rel="stylesheet" href="../style.css">\n')
+      fits_file.write('</head>\n<body>\n')
+      fits_file.write('<p>This page was auto-generated.</p>')
+      fits_file.write('<p>Data in black, background in blue,')
+      fits_file.write(' signal+background in red. ')
+      fits_file.write('All fit models included (scroll to see).</p>')
+      fits_file.write('<p><a href="index.html">Back to summary</a></p>\n')
+      for analyzer, desc in [(self.data_nom_tnp_analyzer, 'Nominal fits'), 
+                       (self.data_altsig_tnp_analyzer, 'Altsig fits'), 
+                       (self.data_altbkg_tnp_analyzer, 'Altbkg fits'), 
+                       (self.data_altsigbkg_tnp_analyzer, 'Altsigbkg fits'),
+                       (self.mc_nom_tnp_analyzer, 'MC constraint fits')]:
+        fits_file.write('<p>{0}</p>'.format(desc))
+        for ibin in range(nbins):
+          fits_file.write(
+            '<img src="{0}_fit{1}.png" width="765" height="256">'.format(
+            analyzer.temp_name,ibin))
+      fits_file.write('</body>\n</html>\n')
+
+  def generate_output(self, is_webversion: bool=False):
     '''Generate final SFs and histograms
+
+    Args:
+      is_webvserion: flag indicating to make png versions of plots
     '''
 
-    if not self.generate_individual_outputs():
-      return
+    if not is_webversion:
+      if not self.generate_individual_outputs():
+        return
 
     #get efficiencies from JSON files
     nomdat_name = self.name+'_data_nom'
@@ -838,30 +997,37 @@ class RmsSFAnalyzer:
       fail_unc.append(sfs[3])
 
     if self.binning_type=='std':
-      self.generate_jsons_nogap(data_eff, data_unc, mc_eff, mc_unc, 
-                                pass_sf, pass_unc, fail_sf, fail_unc)
+      if not is_webversion:
+        self.generate_jsons_nogap(data_eff, data_unc, mc_eff, mc_unc, 
+                                  pass_sf, pass_unc, fail_sf, fail_unc)
       self.generate_summary_plots_nogap(data_eff, data_unc, mc_eff, mc_unc,
-                                        pass_sf, pass_unc, fail_sf, fail_unc)
+                                        pass_sf, pass_unc, fail_sf, fail_unc,
+                                        is_webversion)
     elif self.binning_type=='std_gap':
-      self.generate_jsons_gap(data_eff, data_unc, mc_eff, mc_unc, pass_sf, 
-                              pass_unc, fail_sf, fail_unc)
+      if not is_webversion:
+        self.generate_jsons_gap(data_eff, data_unc, mc_eff, mc_unc, pass_sf, 
+                                pass_unc, fail_sf, fail_unc)
       self.generate_summary_plots_gap(data_eff, data_unc, mc_eff, mc_unc,
-                                      pass_sf, pass_unc, fail_sf, fail_unc)
+                                      pass_sf, pass_unc, fail_sf, fail_unc,
+                                      is_webversion)
     else:
       raise RuntimeError('Unsupported binning')
 
-  def generate_jsons_nogap(self, data_eff, data_unc, mc_eff, mc_unc, pass_sf,
-                           pass_unc, fail_sf, fail_unc):
+  def generate_jsons_nogap(self, data_eff: list[float], data_unc: list[float], 
+                           mc_eff: list[float], mc_unc: list[float], 
+                           pass_sf: list[float], pass_unc: list[float], 
+                           fail_sf: list[float], fail_unc: list[float]):
     '''Generate output assuming standard binning with no gap
 
-    data_eff  list of data efficiencies
-    data_unc  list of data uncertainties
-    mc_eff    list of mc efficiencies
-    mc_unc    list of mc uncertainties
-    pass_sf   list of scale factors (SFs) for passing selection
-    pass_unc  list of uncertainties on passing SFs
-    fail_sf   list of scale factors for failing selection
-    fail_unc  list of uncertainties on failing SFs
+    Args:
+      data_eff: list of data efficiencies
+      data_unc: list of data uncertainties
+      mc_eff: list of mc efficiencies
+      mc_unc: list of mc uncertainties
+      pass_sf: list of scale factors (SFs) for passing selection
+      pass_unc: list of uncertainties on passing SFs
+      fail_sf: list of scale factors for failing selection
+      fail_unc: list of uncertainties on failing SFs
     '''
 
     if not os.path.isdir('out/'+self.name):
@@ -901,18 +1067,21 @@ class RmsSFAnalyzer:
          clib_sfs_fail.json(exclude_unset=True),
          clib_uns_fail.json(exclude_unset=True)]))
 
-  def generate_jsons_gap(self, data_eff, data_unc, mc_eff, mc_unc, pass_sf, 
-                         pass_unc, fail_sf, fail_unc):
+  def generate_jsons_gap(self, data_eff: list[float], data_unc: list[float], 
+                         mc_eff: list[float], mc_unc: list[float], 
+                         pass_sf: list[float], pass_unc: list[float], 
+                         fail_sf: list[float], fail_unc: list[float]):
     '''Generate output assuming standard gap binning
 
-    data_eff  list of data efficiencies
-    data_unc  list of data uncertainties
-    mc_eff    list of mc efficiencies
-    mc_unc    list of mc uncertainties
-    pass_sf   list of scale factors (SFs) for passing selection
-    pass_unc  list of uncertainties on passing SFs
-    fail_sf   list of scale factors for failing selection
-    fail_unc  list of uncertainties on failing SFs
+    Args:
+      data_eff: list of data efficiencies
+      data_unc: list of data uncertainties
+      mc_eff: list of mc efficiencies
+      mc_unc: list of mc uncertainties
+      pass_sf: list of scale factors (SFs) for passing selection
+      pass_unc: list of uncertainties on passing SFs
+      fail_sf: list of scale factors for failing selection
+      fail_unc: list of uncertainties on failing SFs
     '''
     #organize SFs as they will be saved in the JSON
     gapincl_eta_bins, neg_gap_idx, pos_gap_idx = add_gap_eta_bins(self.eta_bins)
@@ -988,32 +1157,38 @@ class RmsSFAnalyzer:
          clib_sfs_fail.json(exclude_unset=True),
          clib_uns_fail.json(exclude_unset=True)]))
 
-  def generate_summary_plots_nogap(self, data_eff, data_unc, mc_eff, mc_unc, 
-                                 pass_sf, pass_unc, fail_sf, fail_unc):
+  def generate_summary_plots_nogap(self, data_eff: list[float], 
+                                   data_unc: list[float], mc_eff: list[float], 
+                                   mc_unc: list[float], pass_sf: list[float], 
+                                   pass_unc: list[float], fail_sf: list[float],
+                                   fail_unc: list[float], 
+                                   is_webversion: bool=False):
     '''generate following plots: 1D eta efficiency plot with MC & data
-                              1D pt efficiency plot with MC & data
-                              gap 1D pt efficiency plot with MC & data
-                              2D efficiency plot with MC
-                              2D efficiency plot with data
-                              1D eta SF plot pass
-                              1D eta SF plot fail
-                              1D pt SF plot pass
-                              1D pt SF plot fail
-                              gap 1D pt SF plot pass
-                              gap 1D pt SF plot fail
-                              2D SF plot pass
-                              2D SF plot fail
-                              2D SF uncertainty plot pass
-                              2D SF uncertainty plot fail
+                                 1D pt efficiency plot with MC & data
+                                 gap 1D pt efficiency plot with MC & data
+                                 2D efficiency plot with MC
+                                 2D efficiency plot with data
+                                 1D eta SF plot pass
+                                 1D eta SF plot fail
+                                 1D pt SF plot pass
+                                 1D pt SF plot fail
+                                 gap 1D pt SF plot pass
+                                 gap 1D pt SF plot fail
+                                 2D SF plot pass
+                                 2D SF plot fail
+                                 2D SF uncertainty plot pass
+                                 2D SF uncertainty plot fail
 
-    data_eff  list of data efficiencies
-    data_unc  list of data uncertainties
-    mc_eff    list of mc efficiencies
-    mc_unc    list of mc uncertainties
-    pass_sf   list of scale factors (SFs) for passing selection
-    pass_unc  list of uncertainties on passing SFs
-    fail_sf   list of scale factors for failing selection
-    fail_unc  list of uncertainties on failing SFs
+    Args:
+      data_eff: list of data efficiencies
+      data_unc: list of data uncertainties
+      mc_eff: list of mc efficiencies
+      mc_unc: list of mc uncertainties
+      pass_sf: list of scale factors (SFs) for passing selection
+      pass_unc: list of uncertainties on passing SFs
+      fail_sf: list of scale factors for failing selection
+      fail_unc: list of uncertainties on failing SFs
+      is_webvserion: flag to indicate if output should be web-friendly
     '''
     eta_plot_x = []
     eta_plot_ex = []
@@ -1102,86 +1277,109 @@ class RmsSFAnalyzer:
       os.system('cp out/{0}_{1}/allfits.pdf out/{0}/{1}_allfits.pdf'.format(self.name,fit_syst))
     gc.collect()
     gc.disable()
+    file_extension = 'pdf'
+    if is_webversion:
+      file_extension = 'png'
     make_data_mc_graph(eta_plot_x, eta_plot_ex, eff_eta_plot_data_y, 
                        eff_eta_plot_data_ey, eff_eta_plot_mc_y, 
                        eff_eta_plot_mc_ey, 
-                       'out/{0}/{0}_eff_etabinned.pdf'.format(self.name), 
+                       'out/{0}/{0}_eff_etabinned.{1}'.format(self.name, 
+                                                              file_extension), 
                        eta_plot_data_names, eta_plot_mc_names,
                        '|#eta|', eff_string, LUMI_TAGS[self.year])
     make_data_mc_graph(pt_plot_x, pt_plot_ex, eff_pt_plot_data_y, 
                        eff_pt_plot_data_ey, eff_pt_plot_mc_y, 
                        eff_pt_plot_mc_ey, 
-                       'out/{0}/{0}_eff_ptbinned.pdf'.format(self.name),
+                       'out/{0}/{0}_eff_ptbinned.{1}'.format(self.name, 
+                                                             file_extension),
                        pt_plot_data_names, pt_plot_mc_names,
                        'p_{T} [GeV]', eff_string, LUMI_TAGS[self.year],True)
     make_heatmap(self.eta_bins, self.pt_bins, eff_pt_plot_data_y, 
-                 'out/{0}/{0}_eff_data.pdf'.format(self.name), '|#eta|', 
+                 'out/{0}/{0}_eff_data.{1}'.format(self.name, file_extension), 
+                 '|#eta|', 
                  'p_{T} [GeV]', 
                  eff_string, LUMI_TAGS[self.year],False,True)
     make_heatmap(self.eta_bins, self.pt_bins, eff_pt_plot_mc_y, 
-                 'out/{0}/{0}_eff_mc.pdf'.format(self.name), '|#eta|', 
+                 'out/{0}/{0}_eff_mc.{1}'.format(self.name, file_extension), 
+                 '|#eta|', 
                  'p_{T} [GeV]',
                  eff_string, LUMI_TAGS[self.year],False,True)
     make_sf_graph(eta_plot_x, eta_plot_ex, sf_eta_plot_pass_y, 
                   sf_eta_plot_pass_ey, 
-                  'out/{0}/{0}_sfpass_etabinned.pdf'.format(self.name),
+                  'out/{0}/{0}_sfpass_etabinned.{1}'.format(self.name, 
+                                                            file_extension),
                   eta_plot_names, '|#eta|', 'Pass SF', LUMI_TAGS[self.year])
     make_sf_graph(eta_plot_x, eta_plot_ex, sf_eta_plot_fail_y, 
                   sf_eta_plot_fail_ey, 
-                  'out/{0}/{0}_sffail_etabinned.pdf'.format(self.name),
+                  'out/{0}/{0}_sffail_etabinned.{1}'.format(self.name, 
+                                                            file_extension),
                   eta_plot_names, '|#eta|', 'Fail SF', LUMI_TAGS[self.year])
     make_sf_graph(pt_plot_x, pt_plot_ex, sf_pt_plot_pass_y, sf_pt_plot_pass_ey,
-                  'out/{0}/{0}_sfpass_ptbinned.pdf'.format(self.name),
+                  'out/{0}/{0}_sfpass_ptbinned.{1}'.format(self.name, 
+                                                           file_extension),
                   pt_plot_names, 'p_{T} [GeV]', 'Pass SF', LUMI_TAGS[self.year],
                   True)
     make_sf_graph(pt_plot_x, pt_plot_ex, sf_pt_plot_fail_y, sf_pt_plot_fail_ey, 
-                  'out/{0}/{0}_sffail_ptbinned.pdf'.format(self.name),
+                  'out/{0}/{0}_sffail_ptbinned.{1}'.format(self.name, 
+                                                           file_extension),
                   pt_plot_names, 'p_{T} [GeV]', 'Fail SF', LUMI_TAGS[self.year],
                   True)
     make_heatmap(self.eta_bins, self.pt_bins, sf_pt_plot_pass_y, 
-                 'out/{0}/{0}_sfpass.pdf'.format(self.name), '|#eta|', 
+                 'out/{0}/{0}_sfpass.{1}'.format(self.name, file_extension), 
+                 '|#eta|', 
                  'p_{T} [GeV]', passsf_string, LUMI_TAGS[self.year], False, 
                  True)
     make_heatmap(self.eta_bins, self.pt_bins, sf_pt_plot_fail_y, 
-                 'out/{0}/{0}_sffail.pdf'.format(self.name), '|#eta|', 
+                 'out/{0}/{0}_sffail.{1}'.format(self.name, file_extension), 
+                 '|#eta|', 
                  'p_{T} [GeV]', failsf_string, LUMI_TAGS[self.year], False, 
                  True)
     make_heatmap(self.eta_bins, self.pt_bins, sf_pt_plot_pass_ey, 
-                 'out/{0}/{0}_sfpass_unc.pdf'.format(self.name), '|#eta|', 
+                 'out/{0}/{0}_sfpass_unc.{1}'.format(self.name, 
+                                                     file_extension), 
+                 '|#eta|', 
                  'p_{T} [GeV]', passunc_string, LUMI_TAGS[self.year], False, 
                  True)
     make_heatmap(self.eta_bins, self.pt_bins, sf_pt_plot_fail_ey, 
-                 'out/{0}/{0}_sffail_unc.pdf'.format(self.name), '|#eta|', 
+                 'out/{0}/{0}_sffail_unc.{1}'.format(self.name, 
+                                                     file_extension), 
+                 '|#eta|', 
                  'p_{T} [GeV]', failunc_string, LUMI_TAGS[self.year], False, 
                  True)
     gc.enable()
 
-  def generate_summary_plots_gap(self, data_eff, data_unc, mc_eff, mc_unc, 
-                                 pass_sf, pass_unc, fail_sf, fail_unc):
+  def generate_summary_plots_gap(self, data_eff: list[float], 
+                                 data_unc: list[float], mc_eff: list[float], 
+                                 mc_unc: list[float], pass_sf: list[float], 
+                                 pass_unc: list[float], fail_sf: list[float], 
+                                 fail_unc: list[float], 
+                                 is_webversion: bool=False):
     '''generate following plots: 1D eta efficiency plot with MC & data
-                              1D pt efficiency plot with MC & data
-                              gap 1D pt efficiency plot with MC & data
-                              2D efficiency plot with MC
-                              2D efficiency plot with data
-                              1D eta SF plot pass
-                              1D eta SF plot fail
-                              1D pt SF plot pass
-                              1D pt SF plot fail
-                              gap 1D pt SF plot pass
-                              gap 1D pt SF plot fail
-                              2D SF plot pass
-                              2D SF plot fail
-                              2D SF uncertainty plot pass
-                              2D SF uncertainty plot fail
+                                 1D pt efficiency plot with MC & data
+                                 gap 1D pt efficiency plot with MC & data
+                                 2D efficiency plot with MC
+                                 2D efficiency plot with data
+                                 1D eta SF plot pass
+                                 1D eta SF plot fail
+                                 1D pt SF plot pass
+                                 1D pt SF plot fail
+                                 gap 1D pt SF plot pass
+                                 gap 1D pt SF plot fail
+                                 2D SF plot pass
+                                 2D SF plot fail
+                                 2D SF uncertainty plot pass
+                                 2D SF uncertainty plot fail
 
-    data_eff  list of data efficiencies
-    data_unc  list of data uncertainties
-    mc_eff    list of mc efficiencies
-    mc_unc    list of mc uncertainties
-    pass_sf   list of scale factors (SFs) for passing selection
-    pass_unc  list of uncertainties on passing SFs
-    fail_sf   list of scale factors for failing selection
-    fail_unc  list of uncertainties on failing SFs
+    Args:
+      data_eff: list of data efficiencies
+      data_unc: list of data uncertainties
+      mc_eff: list of mc efficiencies
+      mc_unc: list of mc uncertainties
+      pass_sf: list of scale factors (SFs) for passing selection
+      pass_unc: list of uncertainties on passing SFs
+      fail_sf: list of scale factors for failing selection
+      fail_unc: list of uncertainties on failing SFs
+      is_webvserion: flag to indicate if output should be web-friendly
     '''
     eta_plot_x = []
     eta_plot_ex = []
@@ -1311,77 +1509,99 @@ class RmsSFAnalyzer:
       os.system('cp out/{0}_{1}/allfits.pdf out/{0}/{1}_allfits.pdf'.format(self.name,fit_syst))
     gc.collect()
     gc.disable()
+    file_extension = 'pdf'
+    if is_webversion:
+      file_extension = 'png'
     make_data_mc_graph(eta_plot_x, eta_plot_ex, eff_eta_plot_data_y, 
                        eff_eta_plot_data_ey, eff_eta_plot_mc_y, 
                        eff_eta_plot_mc_ey, 
-                       'out/{0}/{0}_eff_etabinned.pdf'.format(self.name), 
+                       'out/{0}/{0}_eff_etabinned.{1}'.format(self.name,
+                                                              file_extension), 
                        eta_plot_data_names, eta_plot_mc_names,
                        '#eta', eff_string, LUMI_TAGS[self.year])
     make_data_mc_graph(pt_plot_x, pt_plot_ex, eff_pt_plot_data_y, 
                        eff_pt_plot_data_ey, eff_pt_plot_mc_y, 
                        eff_pt_plot_mc_ey, 
-                       'out/{0}/{0}_eff_ptbinned.pdf'.format(self.name),
+                       'out/{0}/{0}_eff_ptbinned.{1}'.format(self.name,
+                                                             file_extension),
                        pt_plot_data_names, pt_plot_mc_names,
                        'p_{T} [GeV]', eff_string, LUMI_TAGS[self.year],True)
     make_data_mc_graph(gappt_plot_x, gappt_plot_ex, eff_gappt_plot_data_y, 
                        eff_gappt_plot_data_ey, eff_gappt_plot_mc_y, 
                        eff_gappt_plot_mc_ey, 
-                       'out/{0}/{0}_eff_gapptbinned.pdf'.format(self.name),
+                       'out/{0}/{0}_eff_gapptbinned.{1}'.format(self.name,
+                           file_extension),
                        gappt_plot_data_names, gappt_plot_mc_names,
                        'p_{T} [GeV]', eff_string, LUMI_TAGS[self.year],True)
     make_heatmap(self.eta_bins, self.pt_bins, eff_pt_plot_data_y, 
-                 'out/{0}/{0}_eff_data.pdf'.format(self.name), '#eta', 'p_{T} [GeV]', 
+                 'out/{0}/{0}_eff_data.{1}'.format(self.name,file_extension), 
+                 '#eta', 'p_{T} [GeV]', 
                  eff_string, LUMI_TAGS[self.year],False,True)
     make_heatmap(self.eta_bins, self.pt_bins, eff_pt_plot_mc_y, 
-                 'out/{0}/{0}_eff_mc.pdf'.format(self.name), '#eta', 'p_{T} [GeV]',
+                 'out/{0}/{0}_eff_mc.{1}'.format(self.name, file_extension), 
+                 '#eta', 'p_{T} [GeV]',
                  eff_string, LUMI_TAGS[self.year],False,True)
     make_sf_graph(eta_plot_x, eta_plot_ex, sf_eta_plot_pass_y, 
                   sf_eta_plot_pass_ey, 
-                  'out/{0}/{0}_sfpass_etabinned.pdf'.format(self.name),
+                  'out/{0}/{0}_sfpass_etabinned.{1}'.format(self.name, 
+                      file_extension),
                   eta_plot_names, '#eta', 'Pass SF', LUMI_TAGS[self.year])
     make_sf_graph(eta_plot_x, eta_plot_ex, sf_eta_plot_fail_y, 
                   sf_eta_plot_fail_ey, 
-                  'out/{0}/{0}_sffail_etabinned.pdf'.format(self.name),
+                  'out/{0}/{0}_sffail_etabinned.{1}'.format(self.name, 
+                      file_extension),
                   eta_plot_names, '#eta', 'Fail SF', LUMI_TAGS[self.year])
     make_sf_graph(pt_plot_x, pt_plot_ex, sf_pt_plot_pass_y, sf_pt_plot_pass_ey,
-                  'out/{0}/{0}_sfpass_ptbinned.pdf'.format(self.name),
+                  'out/{0}/{0}_sfpass_ptbinned.{1}'.format(self.name,
+                      file_extension),
                   pt_plot_names, 'p_{T} [GeV]', 'Pass SF', LUMI_TAGS[self.year],
                   True)
     make_sf_graph(pt_plot_x, pt_plot_ex, sf_pt_plot_fail_y, sf_pt_plot_fail_ey, 
-                  'out/{0}/{0}_sffail_ptbinned.pdf'.format(self.name),
+                  'out/{0}/{0}_sffail_ptbinned.{1}'.format(self.name,
+                      file_extension),
                   pt_plot_names, 'p_{T} [GeV]', 'Fail SF', LUMI_TAGS[self.year],
                   True)
     make_sf_graph(gappt_plot_x, gappt_plot_ex, sf_gappt_plot_pass_y, 
                   sf_gappt_plot_pass_ey, 
-                  'out/{0}/{0}_sfpass_gapptbinned.pdf'.format(self.name),
+                  'out/{0}/{0}_sfpass_gapptbinned.{1}'.format(self.name,
+                      file_extension),
                   gappt_plot_names, 'p_{T} [GeV]', 'Pass SF', 
                   LUMI_TAGS[self.year], True)
     make_sf_graph(gappt_plot_x, gappt_plot_ex, sf_gappt_plot_fail_y, 
                   sf_gappt_plot_fail_ey, 
-                  'out/{0}/{0}_sffail_gapptbinned.pdf'.format(self.name),
+                  'out/{0}/{0}_sffail_gapptbinned.{1}'.format(self.name,
+                      file_extension),
                   gappt_plot_names, 'p_{T} [GeV]', 'Fail SF', 
                   LUMI_TAGS[self.year], True)
     make_heatmap(self.eta_bins, self.pt_bins, sf_pt_plot_pass_y, 
-                 'out/{0}/{0}_sfpass.pdf'.format(self.name), '#eta', 
+                 'out/{0}/{0}_sfpass.{1}'.format(self.name, file_extension), 
+                 '#eta', 
                  'p_{T} [GeV]', passsf_string, LUMI_TAGS[self.year], False, 
                  True)
     make_heatmap(self.eta_bins, self.pt_bins, sf_pt_plot_fail_y, 
-                 'out/{0}/{0}_sffail.pdf'.format(self.name), '#eta', 
+                 'out/{0}/{0}_sffail.{1}'.format(self.name, file_extension), 
+                 '#eta', 
                  'p_{T} [GeV]', failsf_string, LUMI_TAGS[self.year], False, 
                  True)
     make_heatmap(self.eta_bins, self.pt_bins, sf_pt_plot_pass_ey, 
-                 'out/{0}/{0}_sfpass_unc.pdf'.format(self.name), '#eta', 
+                 'out/{0}/{0}_sfpass_unc.{1}'.format(self.name,
+                                                     file_extension), 
+                 '#eta', 
                  'p_{T} [GeV]', passunc_string, LUMI_TAGS[self.year], False, 
                  True)
     make_heatmap(self.eta_bins, self.pt_bins, sf_pt_plot_fail_ey, 
-                 'out/{0}/{0}_sffail_unc.pdf'.format(self.name), '#eta', 
+                 'out/{0}/{0}_sffail_unc.{1}'.format(self.name, 
+                                                     file_extension), 
+                 '#eta', 
                  'p_{T} [GeV]', failunc_string, LUMI_TAGS[self.year], False, 
                  True)
     gc.enable()
 
-  def run_interactive(self, gamma_add_gauss=False):
-    '''
-    Run an interactive T&P analysis
+  def run_interactive(self, gamma_add_gauss: bool=False):
+    '''Run an interactive T&P analysis
+
+    Args:
+      gamma_add_gauss: use gamma+gaussian background model
     '''
     self.add_models(gamma_add_gauss)
 
@@ -1404,6 +1624,7 @@ class RmsSFAnalyzer:
         print('                               altb,altsb,mc) use bin and pass(=p/f) to ')
         print('                               start from a particular bin and category')
         print('o(utput)                       generate final outputs')
+        print('w(eboutput)                    generate web output')
         print('c(lean)                        cleans previous output')
         print('q(uit)                         exit')
         print('(pre)v(ious)                   list previous commands entered')
@@ -1469,6 +1690,8 @@ class RmsSFAnalyzer:
         exit_loop = True
       elif (user_input[0] == 'c' or user_input[0] == 'clean'):
         self.clean_output()
+      elif (user_input[0] == 'w' or user_input[0] == 'weboutput'):
+        self.generate_web_output()
       elif (user_input[0] == 'v' or user_input[0] == 'previous'):
         for past_command in past_commands:
           print(past_command)

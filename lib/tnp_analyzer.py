@@ -12,21 +12,46 @@ import os
 import ROOT
 from tnp_utils import *
 from merge_pdfs import merge_pdfs
+from collections.abc import Callable
 
 ROOT.gROOT.LoadMacro('./lib/tnp_utils.cpp')
 
 #rng = ROOT.TRandom3()
 
 class TnpAnalyzer:
-  '''
-  Class used to do a T&P analysis. See scripts/example.py for example usage.
+  '''Class used to do a T&P analysis. See scripts/example.py for example usage.
+
+  Attributes:
+    temp_name: name for analyzer
+    fit_var_name: name of fitting variable
+    fit_var_nbins: number of bins for fitting variable
+    fit_var_range: range for fit variable
+    fit_var_weight: weight for fit variable histogram
+    preselection: preselection for fit histogram
+    preselection_desc: description of preslection
+    measurement_variable: selection of which to measure efficiency
+    measurement_desc: description of selection
+    bin_selections: selections defining bins (categories) of measurement
+    bin_names: names of measurement bins
+    nbins: number of bins for measurement
+    nbins_x: number of x-bins for measurement, when bins displayed in 2D
+    input_filenames: data n-tuple filenames
+    tree_name: ROOT TTree name in file
+    temp_file: file used to hold generated histograms
+    model_initializers: collection of model initializers
+    param_initializers: collection of model parameter initializers
+    flag_set_input: indicates input initialized
+    flag_set_fitting_variable: indicates fitting initialized
+    flag_set_measurement_variable: indicated measurement initialized
+    self.flag_set_binning: indicates binning initialized
+    self.custom_fit_range: used to set fit range separately from hist range
   '''
 
-  def __init__(self, name):
-    '''
-    Default constructor
+  def __init__(self, name: str):
+    '''Default constructor
 
-    name  string, name for this tnp_analysis, used in temp file names
+    Args:
+      name: name for this tnp_analysis, used in temp file names
     '''
     self.temp_name = name
     self.fit_var_name = ''
@@ -52,27 +77,28 @@ class TnpAnalyzer:
     self.flag_set_binning = False
     self.custom_fit_range = None
 
-  def set_input_files(self, filenames, tree_name):
-    '''
-    Sets input file
+  def set_input_files(self, filenames: list[str], tree_name: str):
+    '''Sets input file
 
-    filenames  list of strings, name of input files
-    tree_name  string, name of TTree in file
+    Args:
+      filenames: list of strings, name of input files
+      tree_name: string, name of TTree in file
     '''
     self.input_filenames = filenames
     self.tree_name = tree_name
     self.flag_set_input = True
 
-  def set_fitting_variable(self, name, description, nbins, 
-                           var_range, weight='1'):
-    '''
-    Adds information about fitting variable
+  def set_fitting_variable(self, name: str, description: str, 
+                           nbins: int, var_range: tuple[float,float], 
+                           weight: str='1'):
+    '''Adds information about fitting variable
 
-    name         string, name of branch in TTree or C++ expression
-    description  string, name used in plots (with TLaTeX)
-    nbins        int, number of bins to use for fit variable
-    var_range    tuple of two floats, start and end of fit range
-    weight       string, expression for weight to use
+    Args:
+      name: name of branch in TTree or C++ expression
+      description: name used in plots (with TLaTeX)
+      nbins: number of bins to use for fit variable
+      var_range: start and end of fit range
+      weight: expression for weight to use
     '''
     self.fit_var_name = name
     self.fit_var_desc = description
@@ -81,20 +107,20 @@ class TnpAnalyzer:
     self.fit_var_weight = weight
     self.flag_set_fitting_variable = True
 
-  def set_custom_fit_range(self, fit_range):
-    '''
-    Sets a custom fit range separate from the measurement variable range
+  def set_custom_fit_range(self, fit_range: tuple[float,float]):
+    '''Sets a custom fit range separate from the measurement variable range
 
-    fit_range  tuple of two floats indicating range
+    Args:
+      fit_range: tuple of two floats indicating range
     '''
     self.custom_fit_range = fit_range
 
-  def set_measurement_variable(self, var, desc=''):
-    '''
-    Sets selection efficiency to measure with tag & probe
+  def set_measurement_variable(self, var: str, desc: str=''):
+    '''Sets selection efficiency to measure with tag & probe
 
-    var   string, name of branch in TTree or C++ expression
-    desc  string, description of measurement variable
+    Args:
+      var: name of branch in TTree or C++ expression
+      desc: description of measurement variable
     '''
     self.measurement_variable = var 
     self.flag_set_measurement_variable = True
@@ -102,32 +128,35 @@ class TnpAnalyzer:
       desc = var
     self.measurement_desc = desc
 
-  def set_preselection(self, preselection, desc):
-    '''
-    Sets basic preselection applied to all bins
+  def set_preselection(self, preselection: str, desc: str):
+    '''Sets basic preselection applied to all bins
 
-    preselection  string, selection as a C++ expression
-    desc          string, description of selection in TLaTeX
+    Args:
+      preselection: selection as a C++ expression
+      desc: description of selection in TLaTeX
     '''
     self.preselection = preselection
     self.preselection_desc = desc
 
   @staticmethod
-  def make_nd_bin_dimension(name, description, edges):
-    '''
-    Generates a dimension for an even ND binning
+  def make_nd_bin_dimension(name: str, description: str, edges: list[float]):
+    '''Generates a dimension for an even ND binning
 
-    name         string, name of branch in TTree or C++ expression
-    description  string, name used in plots (with TLaTeX)
-    edges        list of floats, bin edges
+    Args:
+      name: name of branch in TTree or C++ expression
+      description: name used in plots (with TLaTeX)
+      edges: bin edges
+
+    Returns:
+      tuple (name, description, edges)
     '''
     return (name, description, edges)
 
-  def add_nd_binning(self,dimensions):
-    '''
-    Sets even n-dimensional binning for TnP analysis
+  def add_nd_binning(self, dimensions: list[tuple[str,str,list[float]]]):
+    '''Sets even n-dimensional binning for TnP analysis
 
-    dimensions  list of tuples generated by make_nd_bin_dimension
+    Args:
+      dimensions: list of tuples generated by make_nd_bin_dimension
     '''
     #calculate number of bins
     ndims = len(dimensions)
@@ -157,12 +186,13 @@ class TnpAnalyzer:
       self.bin_names.append(bin_name)
     self.flag_set_binning = True
 
-  def add_custom_binning(self, bin_selections, bin_names):
-    '''
-    Creates custom bins for TnP analysis
+  def add_custom_binning(self, bin_selections: list[str], 
+                         bin_names: list[str]):
+    '''Creates custom bins for TnP analysis
 
-    bin_selections  list of strings, describes selection for each bin
-    bin_names       list of strings, names of each bin that appear in plots
+    Args:
+      bin_selections: describes selection for each bin
+      bin_names: names of each bin that appear in plots
     '''
     self.nbins = len(bin_selections)
     self.nbins_x = 0
@@ -170,8 +200,9 @@ class TnpAnalyzer:
     self.bin_names = bin_names
     self.flag_set_binning = True
 
-  def add_model(self, model_name, model_initializer):
-    '''
+  def add_model(self, model_name: str, model_initializer: Callable):
+    '''Add fitting model
+
     Adds an initializer for a RooWorkspace, i.e. signal and background shapes
     with appropriate Parameters. See below for examples of model initializers
     The model must take as an argument the fitting variable (as a RooRealVar)
@@ -180,31 +211,43 @@ class TnpAnalyzer:
     fit_var representing the fit variable and a RooAbsPdf pdf_sb representing 
     the S+B model
 
-    model_name         string, name for this model
-    model_initializer  function that returns RooWorkspace, see examples
+    Args:
+      model_name: string, name for this model
+      model_initializer: function that returns RooWorkspace, see examples
     '''
     self.model_initializers[model_name] = model_initializer
 
-  def add_param_initializer(self, name, param_initializer):
-    '''
+  def add_param_initializer(self, name: str, param_initializer: Callable):
+    '''Add fit model parameter initializer
+
     Adds a parameter initializer for a RooWorkspace, i.e. a function that
     takes in the bin number, a bool representing probe pass/fail, and a 
     workspace that sets the parameter values for the workspace
 
-    name               string, name for the parameter initializer
-    param_initializer  function that sets Workspace parameters
+    Args:
+      name: name for the parameter initializer
+      param_initializer: function that sets Workspace parameters
     '''
     self.param_initializers[name] = param_initializer
 
-  def get_binname(self, ibin):
+  def get_binname(self, ibin: int) -> str:
+    '''Get name from bin indexo
+
+    Args:
+      ibin: bin indexo
+
+    Returns:
+      bin name
+    '''
     return clean_string(self.bin_selections[ibin])
 
-  def make_simple_tnp_plot(self, workspace, canvas):
-    '''
-    Draws a simple plot for debugging fits
+  def make_simple_tnp_plot(self, workspace: ROOT.RooWorkspace, 
+                           canvas: ROOT.TCanvas):
+    '''Draws a simple plot for debugging fits
 
-    workspace  T&P RooWorkspace
-    canvas     TCanvas to draw plot on
+    Args:
+      workspace: T&P workspace
+      canvas: canvas to draw plot on
     '''
     plot = workspace.var('fit_var').frame()
     workspace.data('data').plotOn(plot)
@@ -229,8 +272,7 @@ class TnpAnalyzer:
                        'input files, and model before calling run methods.')
 
   def initialize_files_directories(self):
-    '''
-    generates output file and directory if they do not already exist
+    '''Generates output file and directory if they do not already exist
     '''
     #make output directory if it doesn't already exist
     if not os.path.isdir('out'):
@@ -249,16 +291,14 @@ class TnpAnalyzer:
         self.temp_file = ROOT.TFile(temp_file_name,'UPDATE')
 
   def close_file(self):
-    '''
-    Closes temp file
+    '''Closes temp file
     '''
     if (self.temp_file != None):
       self.temp_file.Close()
       self.temp_file = None
 
   def produce_histograms(self):
-    '''
-    Processes the input file(s) and generates histograms for use in fitting
+    '''Processes the input file(s) and generates histograms for use in fitting
     '''
     self.check_initialization()
     self.initialize_files_directories()
@@ -297,14 +337,15 @@ class TnpAnalyzer:
       pass_hist_ptrs[ibin].Write()
       fail_hist_ptrs[ibin].Write()
 
-  def fit_histogram(self, ibin_str, pass_probe, model, param_initializer=''):
-    '''
-    Performs interactive fit to data
+  def fit_histogram(self, ibin_str: str, pass_probe: str, model: str, 
+                    param_initializer: str=''):
+    '''Performs interactive fit to data
 
-    ibin_str           string, bin to fit
-    pass_probe         string, pass or fail
-    model              string, model name
-    param_initializer  string, parameter initializer name
+    Args:
+      ibin_str: bin to fit
+      pass_probe: pass or fail
+      model: model name
+      param_initializer: parameter initializer name
     '''
 
     self.check_initialization()
@@ -510,14 +551,21 @@ class TnpAnalyzer:
               .format(ibin_str, pass_probe))
         exit_loop = True
 
-  def draw_fit_set(self, ibin, filename):
-    '''
+  def draw_fit_set(self, ibin: int, filename: str, 
+                   canvas_size: int=320) -> tuple[float,float]:
+    '''Draws fits and write fit parameters
+
     Draws fits and writes fit parameters. Writes to the current gPad (global 
     ROOT pad pointer) and returns a tuple (effificiency, uncertainty) for the
     current bin
 
-    ibin      int, bin to analyze
-    filename  string, output filename
+    Args:
+      ibin: bin to analyze
+      filename: output filename
+      canvas_size: canvas height (canvas width/3) in pixels
+
+    Returns:
+       efficiency and uncertainty
     '''
 
     #load fit parameters and calculate efficiencies
@@ -550,7 +598,7 @@ class TnpAnalyzer:
       return (eff, unc)
 
     #draw fit to passing leg on middle subpad
-    canvas = ROOT.TCanvas('can','can',3*320,320)
+    canvas = ROOT.TCanvas('can','can',3*canvas_size,canvas_size)
     canvas.Divide(3,1,0.0,0.0)
     canvas.cd(2)
     ROOT.gPad.SetMargin(0.1,0.1,0.1,0.1)
@@ -649,6 +697,8 @@ class TnpAnalyzer:
     return (eff, unc)
 
   def clean_output(self):
+    '''Cleans output directories
+    '''
     plot_filename = 'out/'+self.temp_name+'/allfits.pdf'
     effi_filename = 'out/'+self.temp_name+'/efficiencies.json'
     if os.path.exists(plot_filename):
@@ -660,9 +710,31 @@ class TnpAnalyzer:
       if os.path.exists(fragment_name):
         os.remove(fragment_name)
 
-  def generate_final_output(self):
+  def generate_web_output(self, webdir: str):
+    '''Generates web-friendly fit plots and efficiencies
+
+    Args:
+      webdir: output directory
     '''
-    Generates plots of all the fits and a text file with the measured efficiencies and uncertainties
+    #do checks
+    self.initialize_files_directories()
+    file_keys = self.temp_file.GetListOfKeys()
+    for ibin in range(0,self.nbins):
+      for pass_fail in ('pass','fail'):
+        param_filename = ('out/'+self.temp_name+'/fitinfo_bin'+str(ibin)+
+                          '_'+pass_fail+'.json')
+        if not os.path.exists(param_filename):
+          print('ERROR:'+param_filename+' not found.')
+          return
+
+    #make png plots
+    file_extension = '.png'
+    for ibin in range(0,self.nbins):
+      fragment_name = '{0}/{1}_fit{2}.png'.format(webdir,self.temp_name,ibin)
+      self.draw_fit_set(ibin,fragment_name,640)
+
+  def generate_final_output(self):
+    '''Generates efficiencies and fit plots
     '''
     #do checks
     self.initialize_files_directories()
@@ -687,8 +759,10 @@ class TnpAnalyzer:
       nbins_x = 6
     effs = []
     fragment_names = []
+    file_extension = '.pdf'
     for ibin in range(0,self.nbins):
-      fragment_name = 'out/'+self.temp_name+'/allfits_fragment'+str(ibin)+'.pdf'
+      fragment_name = ('out/'+self.temp_name+'/allfits_fragment'+str(ibin)
+                       +file_extension)
       fragment_names.append(fragment_name)
       effs.append(self.draw_fit_set(ibin,fragment_name))
     fit_plot_name = 'out/'+self.temp_name+'/allfits.pdf'
@@ -698,9 +772,8 @@ class TnpAnalyzer:
     print('Wrote '+effi_filename)
 
   def generate_cut_and_count_output(self):
-    '''
-    Generates simple output file via cut-and-count method i.e. assuming 100% 
-    of events are signal, as is the case in signal MC
+    '''Generates simple output file via cut-and-count method i.e. assuming 
+    100% of events are signal, as is the case in signal MC
     '''
 
     #do checks
@@ -736,8 +809,7 @@ class TnpAnalyzer:
     print('Wrote '+effi_filename)
 
   def print_info(self):
-    '''
-    Prints basic information about T&P Analyzer
+    '''Prints basic information about T&P Analyzer
     '''
     print('Number of bin: '+str(self.nbins))
     print('Available models: ')
@@ -748,8 +820,7 @@ class TnpAnalyzer:
       print('  '+param)
 
   def run_interactive(self):
-    '''
-    Begin interactive run
+    '''Begin interactive T&P analysis run
     '''
 
     self.check_initialization()

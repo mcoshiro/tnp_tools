@@ -1,4 +1,5 @@
 import os
+import shutil
 import subprocess
 
 def strip_extension(filename):
@@ -49,5 +50,6 @@ def merge_pdfs(input_filenames,figures_per_row,output_filename):
   os.remove('rootpdf_to_png_latexdoc.tex')
   os.remove('rootpdf_to_png_latexdoc.aux')
   os.remove('rootpdf_to_png_latexdoc.log')
-  os.rename('rootpdf_to_png_latexdoc.pdf',output_filename)
+  shutil.copy('rootpdf_to_png_latexdoc.pdf',output_filename)
+  os.remove('rootpdf_to_png_latexdoc.pdf')
 
