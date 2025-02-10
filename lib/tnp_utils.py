@@ -176,14 +176,42 @@ def zero_outside_range(hist, lower, upper):
         (hist.GetXaxis().GetBinCenter(ibin) > upper)):
       hist.SetBinContent(ibin, 0.0)
 
+def extend_hist(hist: ROOT.TH1D, low: float, high: float) -> ROOT.TH1D:
+  '''Extends a histogram so it extends from low to high
+
+  Args:
+    hist: histogram to extend
+    low: new low edge
+    high: new high edge
+
+  Returns:
+    extended histogram
+  '''
+  #calculate new binning
+  nbins_old = hist.GetNbinsX()
+  low_old = hist.GetXaxis().GetBinLowEdge(1)
+  bin_width = hist.GetXaxis().GetBinWidth(1)
+  nbins_new = int((high-low)/bin_width)
+  first_old_bin = int((low_old-low)/bin_width)
+  #build new histogram
+  hist_new = ROOT.TH1D(hist.GetName()+'_ext','',nbins_new,low,high)
+  for ibin in range(1,nbins_old+1):
+    new_bin = ibin+first_old_bin
+    hist_new.SetBinContent(new_bin, hist.GetBinContent(ibin))
+    hist_new.SetBinError(new_bin, hist.GetBinError(ibin))
+  return hist_new
+
+
+
 def get_hist_integral_and_error(hist):
   '''
-  Returns integral and associated uncertainty of TH1 as a tuple
+  Returns integral and associated uncertainty of TH1 as a tuple, ignoring
+  overflow bins
 
   hist  TH1 to integrate
   '''
   uncertainty = array('d', [0.0])
-  integral = hist.IntegralAndError(0,hist.GetXaxis().GetNbins()+1,uncertainty)
+  integral = hist.IntegralAndError(1,hist.GetXaxis().GetNbins(),uncertainty)
   return (integral, uncertainty[0])
 
 def get_bin(value, bin_edges):

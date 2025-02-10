@@ -43,8 +43,9 @@ class TnpAnalyzer:
     flag_set_input: indicates input initialized
     flag_set_fitting_variable: indicates fitting initialized
     flag_set_measurement_variable: indicated measurement initialized
-    self.flag_set_binning: indicates binning initialized
-    self.custom_fit_range: used to set fit range separately from hist range
+    flag_set_binning: indicates binning initialized
+    custom_fit_range: used to set fit range separately from hist range
+    template_range: used to set range for any template fit functions
   '''
 
   def __init__(self, name: str):
@@ -76,6 +77,7 @@ class TnpAnalyzer:
     self.flag_set_measurement_variable = False
     self.flag_set_binning = False
     self.custom_fit_range = None
+    self.template_range = None
 
   def set_input_files(self, filenames: list[str], tree_name: str):
     '''Sets input file
@@ -114,6 +116,15 @@ class TnpAnalyzer:
       fit_range: tuple of two floats indicating range
     '''
     self.custom_fit_range = fit_range
+
+  def set_template_range(self, template_range: tuple[float,float]):
+    '''Sets a custom range for MC templates to avoid edge effects
+
+    Args:
+      template_range: tuple of two floats indicating range
+    '''
+    self.template_range = template_range
+
 
   def set_measurement_variable(self, var: str, desc: str=''):
     '''Sets selection efficiency to measure with tag & probe
@@ -241,6 +252,26 @@ class TnpAnalyzer:
     '''
     return clean_string(self.bin_selections[ibin])
 
+  def get_fit_range(self) -> tuple[float,float]:
+    '''Provides range for fit
+    '''
+    fit_range_lower = self.fit_var_range[0]
+    fit_range_upper = self.fit_var_range[1]
+    if not (self.custom_fit_range == None):
+      fit_range_lower = self.custom_fit_range[0]
+      fit_range_upper = self.custom_fit_range[1]
+    return (fit_range_lower,fit_range_upper)
+
+  def get_var_range(self) -> tuple[float,float]:
+    '''Provides range for fitting variable
+    '''
+    var_range_lower = self.fit_var_range[0]
+    var_range_upper = self.fit_var_range[1]
+    if not (self.template_range == None):
+      var_range_lower = self.template_range[0]
+      var_range_upper = self.template_range[1]
+    return (var_range_lower,var_range_upper)
+
   def make_simple_tnp_plot(self, workspace: ROOT.RooWorkspace, 
                            canvas: ROOT.TCanvas):
     '''Draws a simple plot for debugging fits
@@ -249,7 +280,8 @@ class TnpAnalyzer:
       workspace: T&P workspace
       canvas: canvas to draw plot on
     '''
-    plot = workspace.var('fit_var').frame()
+    fit_range_lower, fit_range_upper = self.get_fit_range()
+    plot = workspace.var('fit_var').frame(fit_range_lower, fit_range_upper)
     workspace.data('data').plotOn(plot)
     pdf_sb = workspace.pdf('pdf_sb')
     pdf_sb.plotOn(plot,ROOT.RooFit.Name('fit_sb'))
@@ -381,20 +413,21 @@ class TnpAnalyzer:
       return
 
     #initialize workspace
-    fit_range_lower = self.fit_var_range[0]
-    fit_range_upper = self.fit_var_range[1]
-    if not (self.custom_fit_range == None):
-      fit_range_lower = self.custom_fit_range[0]
-      fit_range_upper = self.custom_fit_range[1]
+    fit_range_lower, fit_range_upper = self.get_fit_range()
+    var_range_lower, var_range_upper = self.get_var_range()
     fit_var = ROOT.RooRealVar('fit_var', self.fit_var_name, 
-                              fit_range_lower, fit_range_upper) 
-    fit_var.setRange(fit_range_lower, fit_range_upper)
+                              var_range_lower, var_range_upper)
+    #fit_var.setBins(10000,"cache")
+    #fit_var.setMin("cache",(self.fit_var_range[0]+fit_range_lower)/2.0)
+    #fit_var.setMax("cache",(self.fit_var_range[1]+fit_range_upper)/2.0)
+    #fit_var.setRange(self.fit_var_range[0], self.fit_var_range[1])
     fit_var.setRange('fitMassRange', fit_range_lower, fit_range_upper)
     workspace = self.model_initializers[model](fit_var, ibin, pass_bool)
-    fit_hist = self.temp_file.Get(hist_name).Clone()
-    zero_outside_range(fit_hist, fit_range_lower, fit_range_upper)
+    fit_hist = extend_hist(self.temp_file.Get(hist_name), var_range_lower,
+                           var_range_upper)
+    #zero_outside_range(fit_hist, fit_range_lower, fit_range_upper)
     data = ROOT.RooDataHist('data','fit variable', ROOT.RooArgList(fit_var), 
-                            self.temp_file.Get(hist_name))
+                            fit_hist)
     getattr(workspace,'import')(data)
     if not param_initializer=='':
       self.param_initializers[param_initializer](ibin, pass_bool, workspace)
@@ -584,12 +617,14 @@ class TnpAnalyzer:
     nsig_pass_unc = pass_param_dict['nSig_unc']
     nsig_fail_unc = fail_param_dict['nSig_unc']
     nsig_total = nsig_pass+nsig_fail
-    nsig_total_unc = math.hypot(nsig_pass_unc, nsig_fail_unc)
+    #nsig_total_unc = math.hypot(nsig_pass_unc, nsig_fail_unc)
     eff = 0.0
     unc = 1.0
     if (nsig_pass > 0.0):
       eff = nsig_pass/nsig_total
-      unc = eff*math.hypot(nsig_pass_unc/nsig_pass, nsig_total_unc/nsig_total)
+      #unc = eff*math.hypot(nsig_pass_unc/nsig_pass, nsig_total_unc/nsig_total)
+      unc = ((eff/nsig_pass-eff**2/nsig_pass)*nsig_pass_unc
+             -(eff**2/nsig_pass)*nsig_fail_unc)
     else:
       print('WARNING: no fit passing signal in bin '+str(ibin))
 
@@ -604,13 +639,10 @@ class TnpAnalyzer:
     ROOT.gPad.SetMargin(0.1,0.1,0.1,0.1)
 
     #initialize workspace
-    fit_range_lower = self.fit_var_range[0]
-    fit_range_upper = self.fit_var_range[1]
-    if not (self.custom_fit_range == None):
-      fit_range_lower = self.custom_fit_range[0]
-      fit_range_upper = self.custom_fit_range[1]
+    fit_range_lower, fit_range_upper = self.get_fit_range()
+    var_range_lower, var_range_upper = self.get_var_range()
     fit_var_pass = ROOT.RooRealVar('fit_var', self.fit_var_name, 
-                              fit_range_lower, fit_range_upper) 
+                              var_range_lower, var_range_upper) 
     pass_workspace = self.model_initializers[pass_param_dict['fit_model']](
         fit_var_pass, ibin, True)
     hist_name = 'hist_pass_bin{}'.format(ibin)
@@ -621,8 +653,8 @@ class TnpAnalyzer:
       if ((not (param_name == 'fit_model' or param_name == 'fit_status')) and
           (not '_unc' in param_name)):
         pass_workspace.var(param_name).setVal(pass_param_dict[param_name])
-    pass_plot = pass_workspace.var('fit_var').frame(ROOT.RooFit.Title(
-        'Passing leg'))
+    pass_plot = pass_workspace.var('fit_var').frame(ROOT.RooFit.Range(
+        fit_range_lower,fit_range_upper),ROOT.RooFit.Title('Passing leg'))
     pass_workspace.data('data').plotOn(pass_plot, ROOT.RooFit.MarkerStyle(1))
     sig_norm_temp = pass_workspace.var('nSig').getValV()
     bak_norm_temp = pass_workspace.var('nBkg').getValV()
@@ -642,7 +674,7 @@ class TnpAnalyzer:
     canvas.cd(3)
     ROOT.gPad.SetMargin(0.1,0.1,0.1,0.1)
     fit_var_fail = ROOT.RooRealVar('fit_var', self.fit_var_name, 
-                              fit_range_lower, fit_range_upper) 
+                              var_range_lower, var_range_upper) 
     fail_workspace = self.model_initializers[fail_param_dict['fit_model']](
         fit_var_fail, ibin, False)
     hist_name = 'hist_fail_bin{}'.format(ibin)
@@ -653,8 +685,8 @@ class TnpAnalyzer:
       if ((not (param_name == 'fit_model' or param_name == 'fit_status')) and
           (not '_unc' in param_name)):
         fail_workspace.var(param_name).setVal(fail_param_dict[param_name])
-    fail_plot = fail_workspace.var('fit_var').frame(ROOT.RooFit.Title(
-        'Failing leg'))
+    fail_plot = fail_workspace.var('fit_var').frame(ROOT.RooFit.Range(
+        fit_range_lower,fit_range_upper),ROOT.RooFit.Title('Failing leg'))
     fail_workspace.data('data').plotOn(fail_plot,ROOT.RooFit.MarkerStyle(1))
     sig_norm_temp = fail_workspace.var('nSig').getValV()
     bak_norm_temp = fail_workspace.var('nBkg').getValV()
@@ -701,10 +733,10 @@ class TnpAnalyzer:
     '''
     plot_filename = 'out/'+self.temp_name+'/allfits.pdf'
     effi_filename = 'out/'+self.temp_name+'/efficiencies.json'
-    if os.path.exists(plot_filename):
-      os.remove(plot_filename)
-    if os.path.exists(effi_filename):
-      os.remove(effi_filename)
+    cnce_filename = 'out/'+self.temp_name+'/cnc_efficiencies.json'
+    for remv_filename in [plot_filename, effi_filename, cnce_filename]:
+      if os.path.exists(remv_filename):
+        os.remove(remv_filename)
     for ibin in range(0,self.nbins):
       fragment_name = 'out/'+self.temp_name+'/allfits_fragment'+str(ibin)+'.pdf'
       if os.path.exists(fragment_name):
@@ -796,10 +828,11 @@ class TnpAnalyzer:
       nfail, nfail_unc = get_hist_integral_and_error(
            self.temp_file.Get('hist_fail_bin{}'.format(ibin)))
       ntotal = npass+nfail
-      ntotal_unc = math.hypot(npass_unc, nfail_unc)
+      #ntotal_unc = math.hypot(npass_unc, nfail_unc)
       if (npass > 0.0):
         eff = npass/ntotal
-        unc = eff*math.hypot(npass_unc/npass, ntotal_unc/ntotal)
+        #unc = eff*math.hypot(npass_unc/npass, ntotal_unc/ntotal)
+        unc = ((eff/npass-eff**2/npass)*npass_unc-(eff**2/npass)*nfail_unc)
       else:
         print('WARNING: no passing signal in bin '+str(ibin))
         unc = 1.5/ntotal

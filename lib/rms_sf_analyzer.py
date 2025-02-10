@@ -547,10 +547,12 @@ class RmsSFAnalyzer:
     '''
     self.data_nom_tnp_analyzer.set_fitting_variable(name, description, nbins, 
                                                     var_range, weight)
+    self.data_nom_tnp_analyzer.set_template_range(custom_mc_range)
     self.data_altsig_tnp_analyzer.set_fitting_variable(name, description, 
                                                        nbins, var_range, weight)
     self.data_altbkg_tnp_analyzer.set_fitting_variable(name, description, 
                                                        nbins, var_range, weight)
+    self.data_altbkg_tnp_analyzer.set_template_range(custom_mc_range)
     self.data_altsigbkg_tnp_analyzer.set_fitting_variable(name, description, 
                                                           nbins, var_range, 
                                                           weight)
@@ -822,9 +824,12 @@ class RmsSFAnalyzer:
     self.data_altbkg_tnp_analyzer.clean_output()
     self.data_altsigbkg_tnp_analyzer.clean_output()
 
-  def generate_individual_outputs(self):
+  def generate_individual_outputs(self, cnc: bool=False):
     '''Generates individual efficiency measurements if they have not already 
     been generated and checks output files are generated correctly
+
+    Args:
+      cnc: use only cut and count rather than fits
 
     Returns:
       true if the outputs are generated correctly
@@ -835,25 +840,41 @@ class RmsSFAnalyzer:
     altsnb_name = self.name+'_data_altsigbkg'
     nomsim_name = self.name+'_mc_nom'
     altsim_name = self.name+'_mc_alt'
-    if not os.path.isfile('out/'+nomdat_name+'/efficiencies.json'):
-      self.data_nom_tnp_analyzer.generate_final_output()
-    if not os.path.isfile('out/'+altsig_name+'/efficiencies.json'):
-      self.data_altsig_tnp_analyzer.generate_final_output()
-    if not os.path.isfile('out/'+altbkg_name+'/efficiencies.json'):
-      self.data_altbkg_tnp_analyzer.generate_final_output()
-    if not os.path.isfile('out/'+altsnb_name+'/efficiencies.json'):
-      self.data_altsigbkg_tnp_analyzer.generate_final_output()
-    if not os.path.isfile('out/'+nomsim_name+'/efficiencies.json'):
-      #just for fit plots
-      self.mc_nom_tnp_analyzer.generate_final_output() 
+    eff_name = 'efficiencies.json'
+    if cnc:
+      eff_name = 'cnc_efficiencies.json'
+    if not cnc:
+      if not os.path.isfile('out/'+nomdat_name+'/efficiencies.json'):
+        self.data_nom_tnp_analyzer.generate_final_output()
+      if not os.path.isfile('out/'+altsig_name+'/efficiencies.json'):
+        self.data_altsig_tnp_analyzer.generate_final_output()
+      if not os.path.isfile('out/'+altbkg_name+'/efficiencies.json'):
+        self.data_altbkg_tnp_analyzer.generate_final_output()
+      if not os.path.isfile('out/'+altsnb_name+'/efficiencies.json'):
+        self.data_altsigbkg_tnp_analyzer.generate_final_output()
+      if not os.path.isfile('out/'+nomsim_name+'/efficiencies.json'):
+        #just for fit plots
+        self.mc_nom_tnp_analyzer.generate_final_output() 
+    else:
+      if not os.path.isfile('out/'+nomdat_name+'/cnc_efficiencies.json'):
+        self.data_nom_tnp_analyzer.generate_cut_and_count_output()
+      if not os.path.isfile('out/'+altsig_name+'/cnc_efficiencies.json'):
+        self.data_altsig_tnp_analyzer.generate_cut_and_count_output()
+      if not os.path.isfile('out/'+altbkg_name+'/cnc_efficiencies.json'):
+        self.data_altbkg_tnp_analyzer.generate_cut_and_count_output()
+      if not os.path.isfile('out/'+altsnb_name+'/cnc_efficiencies.json'):
+        self.data_altsigbkg_tnp_analyzer.generate_cut_and_count_output()
+      if not os.path.isfile('out/'+nomsim_name+'/cnc_efficiencies.json'):
+        #just for fit plots
+        self.mc_nom_tnp_analyzer.generate_cut_and_count_output() 
     if not os.path.isfile('out/'+nomsim_name+'/cnc_efficiencies.json'):
       self.mc_nom_tnp_analyzer.generate_cut_and_count_output()
     if not os.path.isfile('out/'+altsim_name+'/cnc_efficiencies.json'):
       self.mc_alt_tnp_analyzer.generate_cut_and_count_output()
-    if ((not os.path.isfile('out/'+nomdat_name+'/efficiencies.json')) or
-        (not os.path.isfile('out/'+altsig_name+'/efficiencies.json')) or
-        (not os.path.isfile('out/'+altbkg_name+'/efficiencies.json')) or
-        (not os.path.isfile('out/'+altsnb_name+'/efficiencies.json')) or
+    if ((not os.path.isfile('out/'+nomdat_name+'/'+eff_name)) or
+        (not os.path.isfile('out/'+altsig_name+'/'+eff_name)) or
+        (not os.path.isfile('out/'+altbkg_name+'/'+eff_name)) or
+        (not os.path.isfile('out/'+altsnb_name+'/'+eff_name)) or
         (not os.path.isfile('out/'+nomsim_name+'/cnc_efficiencies.json')) or
         (not os.path.isfile('out/'+altsim_name+'/cnc_efficiencies.json'))):
       print('ERROR: Could not generate individual outputs, please ensure '+
@@ -918,15 +939,16 @@ class RmsSFAnalyzer:
             analyzer.temp_name,ibin))
       fits_file.write('</body>\n</html>\n')
 
-  def generate_output(self, is_webversion: bool=False):
+  def generate_output(self, is_webversion: bool=False, cnc: bool=False):
     '''Generate final SFs and histograms
 
     Args:
       is_webvserion: flag indicating to make png versions of plots
+      cnc: flag to use cut-and-count efficiencies rather than fits
     '''
 
     if not is_webversion:
-      if not self.generate_individual_outputs():
+      if not self.generate_individual_outputs(cnc):
         return
 
     #get efficiencies from JSON files
@@ -942,13 +964,16 @@ class RmsSFAnalyzer:
     eff_alt_snb = []
     eff_sim_nom = []
     eff_sim_alt = []
-    with open('out/'+nomdat_name+'/efficiencies.json','r') as input_file:
+    eff_name = 'efficiencies.json'
+    if cnc:
+      eff_name = 'cnc_efficiencies.json'
+    with open('out/'+nomdat_name+'/'+eff_name,'r') as input_file:
       eff_dat_nom = json.loads(input_file.read())
-    with open('out/'+altsig_name+'/efficiencies.json','r') as input_file:
+    with open('out/'+altsig_name+'/'+eff_name,'r') as input_file:
       eff_alt_sig = json.loads(input_file.read())
-    with open('out/'+altbkg_name+'/efficiencies.json','r') as input_file:
+    with open('out/'+altbkg_name+'/'+eff_name,'r') as input_file:
       eff_alt_bkg = json.loads(input_file.read())
-    with open('out/'+altsnb_name+'/efficiencies.json','r') as input_file:
+    with open('out/'+altsnb_name+'/'+eff_name,'r') as input_file:
       eff_alt_snb = json.loads(input_file.read())
     with open('out/'+nomsim_name+'/cnc_efficiencies.json','r') as input_file:
       eff_sim_nom = json.loads(input_file.read())
@@ -1623,7 +1648,7 @@ class RmsSFAnalyzer:
         print('f(it) <sample> [<bin> <pass>]  run interactive session (sample=nom,alts,')
         print('                               altb,altsb,mc) use bin and pass(=p/f) to ')
         print('                               start from a particular bin and category')
-        print('o(utput)                       generate final outputs')
+        print('o(utput) [cnc]                 generate final outputs optionally with cut&count')
         print('w(eboutput)                    generate web output')
         print('c(lean)                        cleans previous output')
         print('q(uit)                         exit')
@@ -1684,8 +1709,12 @@ class RmsSFAnalyzer:
           else:
             print('ERROR: unrecognized argument to f(it)')
       elif (user_input[0] == 'o' or user_input[0] == 'output'):
+        do_cnc = False
+        if len(user_input)>=2:
+          if (user_input[1] == 'cnc'):
+            do_cnc = True
         #TODO add calls to outputs for each individual piece
-        self.generate_output()
+        self.generate_output(False, do_cnc)
       elif (user_input[0] == 'q' or user_input[0] == 'quit'):
         exit_loop = True
       elif (user_input[0] == 'c' or user_input[0] == 'clean'):
