@@ -88,6 +88,8 @@ if __name__=='__main__':
   argument_parser = ArgumentParser(prog='nano_to_trigntuple',
       description='Converts NanoAOD to TnP n-tuple')
   argument_parser.add_argument('-i','--input_filename')
+  argument_parser.add_argument('-c','--channel',choices=['el','mu'],
+                               default='el')
   argument_parser.add_argument('-o','--output_filename')
   args = argument_parser.parse_args()
 
@@ -99,22 +101,44 @@ if __name__=='__main__':
     output_filename = args.output_filename[:-5]+index+'.root'
 
     df = ROOT.RDataFrame('tree',args.input_filename)
-    df = df.Filter('nmu==2&&nll>=1&&nel==0')
-    df = df.Filter('(trig_single_mu&&mu_pt[0]>28)'
-                   +'||(trig_double_mu&&mu_pt[0]>20&&mu_pt[1]>10)')
-    if not is_data:
-      df = df.Filter('(mu_pflavor[0]==1&&mu_pflavor[1]==1)')
-    df = df.Define('probe_mu_pt','mu_pt['+index+']')
-    df = df.Define('probe_mu_abseta','fabs(mu_eta['+index+'])')
-    df = df.Define('probe_mu_miniso','mu_miniso['+index+']')
-    df = df.Define('pair_mass', 'll_m[0]')
+    if args.channel=='mu':
+      df = df.Filter('nmu==2&&nll>=1&&nel==0')
+      df = df.Filter('(trig_single_mu&&mu_pt[0]>28)'
+                     +'||(trig_double_mu&&mu_pt[0]>20&&mu_pt[1]>10)')
+      df = df.Filter('ll_m[0]>50&&ll_m[0]<130')
+      if not is_data:
+        df = df.Filter('(mu_pflavor[0]==1&&mu_pflavor[1]==1)')
+      df = df.Define('probe_mu_pt','mu_pt['+index+']')
+      df = df.Define('probe_mu_abseta','fabs(mu_eta['+index+'])')
+      df = df.Define('probe_mu_miniso','mu_miniso['+index+']')
+      df = df.Define('pair_mass', 'll_m[0]')
 
-    if is_data:
-      df = df.Define('w_lumiyearpu','1')
-    else:
-      df = df.Define('w_year',str(LUMI[year]))
-      df = df.Define('w_lumiyearpu','w_lumi*w_year*w_pu')
-    df.Snapshot('tree',output_filename,['probe_mu_pt','probe_mu_abseta',
-                                        'probe_mu_miniso','pair_mass',
-                                        'w_lumiyearpu'])
+      if is_data:
+        df = df.Define('w_lumiyearpu','1')
+      else:
+        df = df.Define('w_year',str(LUMI[year]))
+        df = df.Define('w_lumiyearpu','w_lumi*w_year*w_pu')
+      df.Snapshot('tree',output_filename,['probe_mu_pt','probe_mu_abseta',
+                                          'probe_mu_miniso','pair_mass',
+                                          'w_lumiyearpu'])
+    elif args.channel=='el':
+      df = df.Filter('nel==2&&nll>=1&&nmu==0')
+      df = df.Filter('(trig_single_el&&el_pt[0]>35)'
+                     +'||(trig_double_el&&el_pt[0]>25&&el_pt[1]>15)')
+      df = df.Filter('ll_m[0]>50&&ll_m[0]<130')
+      if not is_data:
+        df = df.Filter('(el_pflavor[0]==1&&el_pflavor[1]==1)')
+      df = df.Define('probe_el_pt','el_pt['+index+']')
+      df = df.Define('probe_el_eta','el_eta['+index+']')
+      df = df.Define('probe_el_miniso','el_miniso['+index+']')
+      df = df.Define('pair_mass', 'll_m[0]')
+
+      if is_data:
+        df = df.Define('w_lumiyearpu','1')
+      else:
+        df = df.Define('w_year',str(LUMI[year]))
+        df = df.Define('w_lumiyearpu','w_lumi*w_year*w_pu')
+      df.Snapshot('tree',output_filename,['probe_el_pt','probe_el_eta',
+                                          'probe_el_miniso','pair_mass',
+                                          'w_lumiyearpu'])
 

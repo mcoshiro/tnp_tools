@@ -39,7 +39,8 @@ if __name__=='__main__':
   muiso_analyzer.year = year
   muiso_analyzer.set_input_files(data_filenames,mc_filenames,mcalt_filenames,
                                  'tree')
-  muiso_analyzer.set_fitting_variable('pair_mass','m_{#mu#mu} [GeV]')
+  muiso_analyzer.set_fitting_variable('pair_mass','m_{#mu#mu} [GeV]',
+                                      weight_mc='w_lumiyearpu')
   muiso_analyzer.set_measurement_variable(measurement_cut,measurement_desc)
   muiso_analyzer.set_preselection(preselection,preselection,preselection)
   muiso_analyzer.add_standard_binning(pt_binning,eta_binning,

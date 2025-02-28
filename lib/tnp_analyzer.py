@@ -9,6 +9,7 @@ For CMS members, see https://twiki.cern.ch/twiki/bin/view/CMS/ElectronScaleFacto
 import json
 import math
 import os
+import random
 import ROOT
 from tnp_utils import *
 from merge_pdfs import merge_pdfs
@@ -473,8 +474,17 @@ class TnpAnalyzer:
         print('q(uit)!                  exit session without saving result')
         print('j(son) <s/l> <fname>     saves or loads parameters to JSON file')
         print('r(evert)                 revert to prefit parameter values')
+        print('ra(ndomize)              randomize non-constant values')
         print('s(et) <var> <value>      set variable <var> to <value>')
         print('w(rite) <fname>          write current canvas to a file')
+      elif user_input[0]=='randomize' or user_input[0]=='ra':
+        workspace_vars = workspace_vars_to_list(workspace)
+        for param_name in workspace_vars:
+          if not workspace.var(param_name).isConstant():
+            param_max = workspace.var(param_name).getMax()
+            param_min = workspace.var(param_name).getMin()
+            workspace.var(param_name).setVal(random.uniform(param_min, 
+                                                            param_max))
       elif user_input[0]=='constant' or user_input[0]=='c':
         if len(user_input)<3:
           print('ERROR: (c)onstant takes two arguments: set <var> <value>')
@@ -487,6 +497,13 @@ class TnpAnalyzer:
             or user_input[2] == 'F' or user_input[2] == 'f'):
           constant_value = False
         workspace.var(user_input[1]).setConstant(constant_value)
+        if len(user_input)>=4:
+          try:
+            float(user_input[3])
+            workspace.var(user_input[1]).setVal(float(user_input[3]))
+            self.make_simple_tnp_plot(workspace, canvas)
+          except ValueError:
+            print('ERROR: Unable to cast value, skipping input.')
       elif user_input[0]=='set' or user_input[0]=='s':
         if len(user_input)<3:
           print('ERROR: (s)et takes two arguments: set <var> <value>')
@@ -642,12 +659,15 @@ class TnpAnalyzer:
     fit_range_lower, fit_range_upper = self.get_fit_range()
     var_range_lower, var_range_upper = self.get_var_range()
     fit_var_pass = ROOT.RooRealVar('fit_var', self.fit_var_name, 
-                              var_range_lower, var_range_upper) 
+                                   var_range_lower, var_range_upper) 
+    fit_var_pass.setRange('fitMassRange', fit_range_lower, fit_range_upper)
     pass_workspace = self.model_initializers[pass_param_dict['fit_model']](
         fit_var_pass, ibin, True)
     hist_name = 'hist_pass_bin{}'.format(ibin)
+    fit_hist_pass = extend_hist(self.temp_file.Get(hist_name), var_range_lower,
+                                var_range_upper)
     data_pass = ROOT.RooDataHist('data','fit variable', ROOT.RooArgList(
-        fit_var_pass),self.temp_file.Get(hist_name))
+        fit_var_pass),fit_hist_pass)
     getattr(pass_workspace,'import')(data_pass)
     for param_name in pass_param_dict:
       if ((not (param_name == 'fit_model' or param_name == 'fit_status')) and
@@ -662,10 +682,12 @@ class TnpAnalyzer:
     pass_workspace.pdf('pdf_sb').plotOn(pass_plot,
         ROOT.RooFit.Normalization(bak_norm_temp/(sig_norm_temp+bak_norm_temp),
         ROOT.RooAbsReal.Relative),ROOT.RooFit.Name('fit_b'),
+        ROOT.RooFit.NormRange('fitMassRange'),
         ROOT.RooFit.LineWidth(1),ROOT.RooFit.LineColor(ROOT.kBlue))
     pass_workspace.var('nSig').setVal(sig_norm_temp)
     pass_workspace.pdf('pdf_sb').plotOn(pass_plot,ROOT.RooFit.Name('fit_sb'),
                                         ROOT.RooFit.LineWidth(1),
+                                        ROOT.RooFit.NormRange('fitMassRange'),
                                         ROOT.RooFit.LineColor(ROOT.kRed))
     pass_plot.Draw()
     ROOT.gPad.Update()
@@ -675,11 +697,14 @@ class TnpAnalyzer:
     ROOT.gPad.SetMargin(0.1,0.1,0.1,0.1)
     fit_var_fail = ROOT.RooRealVar('fit_var', self.fit_var_name, 
                               var_range_lower, var_range_upper) 
+    fit_var_fail.setRange('fitMassRange', fit_range_lower, fit_range_upper)
     fail_workspace = self.model_initializers[fail_param_dict['fit_model']](
         fit_var_fail, ibin, False)
     hist_name = 'hist_fail_bin{}'.format(ibin)
+    fit_hist_fail = extend_hist(self.temp_file.Get(hist_name), var_range_lower,
+                                var_range_upper)
     data_fail = ROOT.RooDataHist('data','fit variable', ROOT.RooArgList(
-        fit_var_fail),self.temp_file.Get(hist_name))
+        fit_var_fail),fit_hist_fail)
     getattr(fail_workspace,'import')(data_fail)
     for param_name in fail_param_dict:
       if ((not (param_name == 'fit_model' or param_name == 'fit_status')) and
@@ -694,10 +719,12 @@ class TnpAnalyzer:
     fail_workspace.pdf('pdf_sb').plotOn(fail_plot,
         ROOT.RooFit.Normalization(bak_norm_temp/(sig_norm_temp+bak_norm_temp),
         ROOT.RooAbsReal.Relative),ROOT.RooFit.Name('fit_b'),
+        ROOT.RooFit.NormRange('fitMassRange'),
         ROOT.RooFit.LineWidth(1),ROOT.RooFit.LineColor(ROOT.kBlue))
     fail_workspace.var('nSig').setVal(sig_norm_temp)
     fail_workspace.pdf('pdf_sb').plotOn(fail_plot,ROOT.RooFit.Name('fit_sb'),
                                         ROOT.RooFit.LineWidth(1),
+                                        ROOT.RooFit.NormRange('fitMassRange'),
                                         ROOT.RooFit.LineColor(ROOT.kRed))
     fail_plot.Draw()
     ROOT.gPad.Update()

@@ -3,6 +3,7 @@ Package containing utilities for tag-and-probe analyses
 """
 
 from array import array
+from math import sqrt
 import json
 import ROOT
 
@@ -201,8 +202,6 @@ def extend_hist(hist: ROOT.TH1D, low: float, high: float) -> ROOT.TH1D:
     hist_new.SetBinError(new_bin, hist.GetBinError(ibin))
   return hist_new
 
-
-
 def get_hist_integral_and_error(hist):
   '''
   Returns integral and associated uncertainty of TH1 as a tuple, ignoring
@@ -245,5 +244,27 @@ def fix_correctionlib_json(json_texts):
   }
   return json.dumps(json_dict,indent=2)
 
+def bin_wilson_ci(n_pass: float, n_fail: float) -> tuple[float,float]:
+  '''Calculates Wilson approximation to Bernoulli mean confidence interval
+
+  Calculates a confidence interval for the pass probability of a Bernoulli
+  random variable following the Wilson approximation
+
+  Args:
+    n_pass: number of passes
+    n_fail: number of fails
+
+  Returns:
+    (lower CI bound, upper CI bound)
+  '''
+  z = 1.0
+  n_total = n_pass+n_fail
+  p_est = n_pass/n_total
+  a = (1.0+(z**2)/n_total)
+  b = -2.0*p_est-(z**2)/n_total
+  c = p_est**2
+  lower = (-1.0*b-sqrt(b**2-4.0*a*c))/2.0/a
+  upper = (-1.0*b+sqrt(b**2-4.0*a*c))/2.0/a
+  return (lower, upper)
 
 
