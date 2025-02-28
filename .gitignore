@@ -1,2 +1,6 @@
 *.json
+lib/*.d
+lib/*.so
+lib/*.pcm
+lib/__pycache__
 out/*

@@ -10,19 +10,21 @@ if __name__=='__main__':
   argument_parser = ArgumentParser(prog='eltrig',
       description='Driver script for electron trigger SF measurment.')
   argument_parser.add_argument('-y','--year',choices=['2016APV','2016',
-      '2017','2018','2022','2022EE','2023','2023BPix'],default='2016APV')
+      '2017','2018','2022','2022EE','2023','2023BPix','2023BPixHole'],
+      default='2016APV')
   argument_parser.add_argument('-t','--trig',choices=['singleel','diel23',
       'diel12'],default='singleel')
   args = argument_parser.parse_args()
   
   #default: 2016APV ele27
-  data_filenames = ['/data2/oshiro/ntuples/2016APV/Run2016B_L1matched.root',
-                    '/data2/oshiro/ntuples/2016APV/Run2016C_L1matched.root',
-                    '/data2/oshiro/ntuples/2016APV/Run2016D_L1matched.root',
-                    '/data2/oshiro/ntuples/2016APV/Run2016E_L1matched.root',
-                    '/data2/oshiro/ntuples/2016APV/Run2016F_L1matched.root']
-  mc_filenames = ['/data2/oshiro/ntuples/2016APV/DY_NLO_L1matched.root']
-  mcalt_filenames = ['/data2/oshiro/ntuples/2016APV/DY_LO_L1matched.root']
+  file_path = '/eos/cms/store/group/phys_egamma/tnpTuples/rasharma/2021-02-10/UL2016preVFP/merged/'
+  data_filenames = [file_path+'Run2016B_L1matched.root',
+                    file_path+'Run2016C_L1matched.root',
+                    file_path+'Run2016D_L1matched.root',
+                    file_path+'Run2016E_L1matched.root',
+                    file_path+'Run2016F_L1matched.root']
+  mc_filenames = [file_path+'DY_NLO_L1matched.root']
+  mcalt_filenames = [file_path+'DY_LO_L1matched.root']
   measurement_cut = 'passHltEle27WPTightGsf'
   measurement_desc = 'HLT_Ele27_WPTight_Gsf'
   preselection = ('tag_Ele_pt>40&&tag_Ele_abseta<2.17&&(tag_Ele_q+el_q)==0'
@@ -85,32 +87,84 @@ if __name__=='__main__':
       pt_binning = [7.0,31.0,32.0,33.0,34.0,35.0,38.0,45.0,80.0,120.0,500.0]
       eta_binning = [-2.5,-2.0,-1.5,-0.8,0.0,0.8,1.5,2.0,2.5]
       gappt_binning = [7.0,32.0,45.0,500.0]
+  elif (year == '2022'):
+    preselection = ('tag_Ele_pt>40&&tag_Ele_abseta<2.17&&(tag_Ele_q+el_q)==0'
+                 +'&&el_pt>7&&fabs(el_sc_eta)<2.5&&fabs(el_dz)<1.0'
+                 +'&&fabs(el_dxy)<0.5' + '&&((fabs(el_eta)<0.8 && el_pt>5 && el_pt<10 && el_hzzMVA>0.9266) || (fabs(el_eta)<0.8 && el_pt>10 && el_hzzMVA>0.3527) || (fabs(el_eta)>0.8 && el_eta<1.479 && el_pt>5 && el_pt<10 && el_hzzMVA>0.9138) || (fabs(el_eta)>0.8 && el_eta<1.479 && el_pt>10 && el_hzzMVA>0.2601) || (fabs(el_eta)>1.479 && el_pt>5 && el_pt<10 && el_hzzMVA>0.9682) || (fabs(el_eta)>1.479 && el_pt>10 && el_hzzMVA>-0.4963))')
+    file_path = '/eos/cms/store/group/phys_egamma/tnpTuples/jgrassi/2024-03-12/'
+    data_filenames = [file_path+'data_EGamma_2022CD_merged.root']
+    mc_filenames = [file_path+'mc_DY_NLO_2022preEE_merged.root']
+    mcalt_filenames = [file_path+'mc_DY_LO_2022preEE_merged.root']
+    if args.trig=='singleel':
+      measurement_cut = 'passHltEle30WPTightGsf'
+      measurement_desc = 'HLT_Ele30_WPTight'
+      analyzer_name = 'eltrig30'
+      pt_binning = [7.0,31.0,32.0,33.0,34.0,35.0,38.0,45.0,80.0,120.0,500.0]
+      eta_binning = [-2.5,-2.0,-1.5,-0.8,0.0,0.8,1.5,2.0,2.5]
+      gappt_binning = [7.0,30.0,45.0,500.0]
+  elif (year == '2022EE'):
+    preselection = ('tag_Ele_pt>40&&tag_Ele_abseta<2.17&&(tag_Ele_q+el_q)==0'
+                 +'&&el_pt>7&&fabs(el_sc_eta)<2.5&&fabs(el_dz)<1.0'
+                 +'&&fabs(el_dxy)<0.5' + '&&((fabs(el_eta)<0.8 && el_pt>5 && el_pt<10 && el_hzzMVA>0.9266) || (fabs(el_eta)<0.8 && el_pt>10 && el_hzzMVA>0.3527) || (fabs(el_eta)>0.8 && el_eta<1.479 && el_pt>5 && el_pt<10 && el_hzzMVA>0.9138) || (fabs(el_eta)>0.8 && el_eta<1.479 && el_pt>10 && el_hzzMVA>0.2601) || (fabs(el_eta)>1.479 && el_pt>5 && el_pt<10 && el_hzzMVA>0.9682) || (fabs(el_eta)>1.479 && el_pt>10 && el_hzzMVA>-0.4963))')
+    file_path = '/eos/cms/store/group/phys_egamma/tnpTuples/jgrassi/2024-03-12/'
+    data_filenames = [file_path+'data_EGamma_2022EFG_merged.root']
+    mc_filenames = [file_path+'mc_DY_NLO_2022postEE_merged.root']
+    mcalt_filenames = [file_path+'mc_DY_LO_2022postEE_merged.root']
+    if args.trig=='singleel':
+      measurement_cut = 'passHltEle30WPTightGsf'
+      measurement_desc = 'HLT_Ele30_WPTight'
+      analyzer_name = 'eltrig30'
+      pt_binning = [7.0,31.0,32.0,33.0,34.0,35.0,38.0,45.0,80.0,120.0,500.0]
+      eta_binning = [-2.5,-2.0,-1.5,-0.8,0.0,0.8,1.5,2.0,2.5]
+      gappt_binning = [7.0,30.0,45.0,500.0]
+  elif (year == '2023'):
+    preselection = ('tag_Ele_pt>40&&tag_Ele_abseta<2.17&&(tag_Ele_q+el_q)==0'
+               +'&&el_pt>7&&fabs(el_sc_eta)<2.5&&fabs(el_dz)<1.0'
+               +'&&fabs(el_dxy)<0.5' + '&&((fabs(el_eta)<0.8 && el_pt>5 && el_pt<10 && el_hzzMVA>0.9266) || (fabs(el_eta)<0.8 && el_pt>10 && el_hzzMVA>0.3527) || (fabs(el_eta)>0.8 && el_eta<1.479 && el_pt>5 && el_pt<10 && el_hzzMVA>0.9138) || (fabs(el_eta)>0.8 && el_eta<1.479 && el_pt>10 && el_hzzMVA>0.2601) || (fabs(el_eta)>1.479 && el_pt>5 && el_pt<10 && el_hzzMVA>0.9682) || (fabs(el_eta)>1.479 && el_pt>10 && el_hzzMVA>-0.4963))')
+    file_path = "/eos/cms/store/group/phys_egamma/tnpTuples/jgrassi/2024-03-12/"
+    data_filenames = [file_path+'data_EGamma_2023C_merged.root']
+    mc_filenames = [file_path+'mc_DY_NLO_2023preBPIX_merged.root']
+    mcalt_filenames = [file_path+'mc_DY_LO_2023preBPIX_merged.root']
+    if args.trig=='singleel':
+      measurement_cut = 'passHltEle30WPTightGsf'
+      measurement_desc = 'HLT_Ele30_WPTight'
+      analyzer_name = 'eltrig30'
+      pt_binning = [7.0,31.0,32.0,33.0,34.0,35.0,38.0,45.0,80.0,120.0,500.0]
+      eta_binning = [-2.5,-2.0,-1.5,-0.8,0.0,0.8,1.5,2.0,2.5]
+      gappt_binning = [7.0,30.0,45.0,500.0]
+
   elif (year == '2023BPix'):
-    file_path = '/eos/cms/store/group/phys_egamma/ec/tnpTuples/Prompt2023/'
-    data_filenames = [file_path+'data_2023D.root']
-    mc_filenames = [file_path+'DY_NLO_2023postBPIX.root']
-    mcalt_filenames = [file_path+'DY_LO_2023postBPIX.root']
+    preselection = ('tag_Ele_pt>40&&tag_Ele_abseta<2.17&&(tag_Ele_q+el_q)==0'
+               +'&&el_pt>7&&fabs(el_sc_eta)<2.5&&fabs(el_dz)<1.0'
+               +'&&fabs(el_dxy)<0.5' + '&&((fabs(el_eta)<0.8 && el_pt>5 && el_pt<10 && el_hzzMVA>0.9266) || (fabs(el_eta)<0.8 && el_pt>10 && el_hzzMVA>0.3527) || (fabs(el_eta)>0.8 && el_eta<1.479 && el_pt>5 && el_pt<10 && el_hzzMVA>0.9138) || (fabs(el_eta)>0.8 && el_eta<1.479 && el_pt>10 && el_hzzMVA>0.2601) || (fabs(el_eta)>1.479 && el_pt>5 && el_pt<10 && el_hzzMVA>0.9682) || (fabs(el_eta)>1.479 && el_pt>10 && el_hzzMVA>-0.4963))')
     preselection += '&&!(el_eta>-1.5&&el_eta<0.0&&el_phi>-1.2&&el_phi<-0.8)'
+    file_path = "/eos/cms/store/group/phys_egamma/tnpTuples/jgrassi/2024-03-12/"
+    data_filenames = [file_path+'data_EGamma_2023D_merged.root']
+    mc_filenames = [file_path+'mc_DY_NLO_2023postBPIX_merged.root']
+    mcalt_filenames = [file_path+'mc_DY_LO_2023postBPIX_merged.root']
     if args.trig=='singleel':
       measurement_cut = 'passHltEle30WPTightGsf'
       measurement_desc = 'HLT_Ele30_WPTight'
       analyzer_name = 'eltrig30'
-      pt_binning = [7.0,29.0,30.0,31.0,32.0,35.0,38.0,45.0,80.0,120.0,500.0]
+      pt_binning = [7.0,31.0,32.0,33.0,34.0,35.0,38.0,45.0,80.0,120.0,500.0]
       eta_binning = [-2.5,-2.0,-1.5,-0.8,0.0,0.8,1.5,2.0,2.5]
-      gappt_binning = [7.0,32.0,45.0,500.0]
+      gappt_binning = [7.0,30.0,45.0,500.0]
   elif (year == '2023BPixHole'):
-    file_path = '/eos/cms/store/group/phys_egamma/ec/tnpTuples/Prompt2023/'
-    data_filenames = [file_path+'data_2023D.root']
-    mc_filenames = [file_path+'DY_NLO_2023postBPIX.root']
-    mcalt_filenames = [file_path+'DY_LO_2023postBPIX.root']
+    preselection = ('tag_Ele_pt>40&&tag_Ele_abseta<2.17&&(tag_Ele_q+el_q)==0'
+               +'&&el_pt>7&&fabs(el_sc_eta)<2.5&&fabs(el_dz)<1.0'
+               +'&&fabs(el_dxy)<0.5' + '&&((fabs(el_eta)<0.8 && el_pt>5 && el_pt<10 && el_hzzMVA>0.9266) || (fabs(el_eta)<0.8 && el_pt>10 && el_hzzMVA>0.3527) || (fabs(el_eta)>0.8 && el_eta<1.479 && el_pt>5 && el_pt<10 && el_hzzMVA>0.9138) || (fabs(el_eta)>0.8 && el_eta<1.479 && el_pt>10 && el_hzzMVA>0.2601) || (fabs(el_eta)>1.479 && el_pt>5 && el_pt<10 && el_hzzMVA>0.9682) || (fabs(el_eta)>1.479 && el_pt>10 && el_hzzMVA>-0.4963))')
     preselection += '&&(el_eta>-1.5&&el_eta<0.0&&el_phi>-1.2&&el_phi<-0.8)'
+    file_path = "/eos/cms/store/group/phys_egamma/tnpTuples/jgrassi/2024-03-12/"
+    data_filenames = [file_path+'data_EGamma_2023D_merged.root']
+    mc_filenames = [file_path+'mc_DY_NLO_2023postBPIX_merged.root']
+    mcalt_filenames = [file_path+'mc_DY_LO_2023postBPIX_merged.root']
     if args.trig=='singleel':
       measurement_cut = 'passHltEle30WPTightGsf'
       measurement_desc = 'HLT_Ele30_WPTight'
       analyzer_name = 'eltrig30'
-      pt_binning = [7.0,29.0,30.0,31.0,32.0,35.0,38.0,45.0,80.0,120.0,500.0]
+      pt_binning = [7.0,31.0,32.0,33.0,34.0,35.0,38.0,45.0,80.0,120.0,500.0]
       eta_binning = [-2.5,-2.0,-1.5,-0.8,0.0,0.8,1.5,2.0,2.5]
-      gappt_binning = [7.0,32.0,45.0,500.0]
+      gappt_binning = [7.0,30.0,45.0,500.0]
 
   analyzer_name = 'hzg_'+analyzer_name+'_'+year
   preselection_mc = preselection + '&&(mcTrue==1)'
@@ -129,4 +183,5 @@ if __name__=='__main__':
     eltrig_analyzer.add_standard_binning(pt_binning,[-1.566,-1.4442,-0.8,0.0],
                                          'el_pt','el_sc_eta')
   eltrig_analyzer.run_interactive()
+
 

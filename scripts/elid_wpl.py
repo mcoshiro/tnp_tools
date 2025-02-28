@@ -15,13 +15,15 @@ if __name__=='__main__':
   args = argument_parser.parse_args()
 
   #default: 2016APV
-  data_filenames = ['/data2/oshiro/ntuples/2016APV/Run2016B_L1matched.root',
-                    '/data2/oshiro/ntuples/2016APV/Run2016C_L1matched.root',
-                    '/data2/oshiro/ntuples/2016APV/Run2016D_L1matched.root',
-                    '/data2/oshiro/ntuples/2016APV/Run2016E_L1matched.root',
-                    '/data2/oshiro/ntuples/2016APV/Run2016F_L1matched.root']
-  mc_filenames = ['/data2/oshiro/ntuples/2016APV/DY_NLO_L1matched.root']
-  mcalt_filenames = ['/data2/oshiro/ntuples/2016APV/DY_LO_L1matched.root']
+  file_path = ('/eos/cms/store/group/phys_egamma/tnpTuples/rasharma/'
+               '2021-02-10/UL2016preVFP/merged/')
+  data_filenames = [file_path+'Run2016B_L1matched.root',
+                    file_path+'Run2016C_L1matched.root',
+                    file_path+'Run2016D_L1matched.root',
+                    file_path+'Run2016E_L1matched.root',
+                    file_path+'Run2016F_L1matched.root']
+  mc_filenames = [file_path+'DY_NLO_L1matched.root']
+  mcalt_filenames = [file_path+'DY_LO_L1matched.root']
   measurement_cut = ('fabs(el_dz)<1.0&&fabs(el_dxy)<0.5'
                     +'&&passingMVA94XwpLooseisoV2')
   measurement_desc = 'H#rightarrow Z#gamma electron ID'
@@ -71,26 +73,32 @@ if __name__=='__main__':
     measurement_desc = 'H#rightarrow Z#gamma electron ID'
     preselection = 'tag_Ele_pt>30&&tag_Ele_abseta<2.17&&(tag_Ele_q+el_q)==0'
   elif (year == '2023'):
-    file_path = '/eos/cms/store/group/phys_egamma/ec/tnpTuples/Prompt2023/'
-    data_filenames = [file_path+'data_2023C.root']
-    mc_filenames = [file_path+'DY_NLO_2023preBPIX.root']
-    mcalt_filenames = [file_path+'DY_LO_2023preBPIX.root']
+    file_path = "/eos/cms/store/group/phys_egamma/tnpTuples/jgrassi/2024-03-12/"
+    data_filenames = [file_path+'data_EGamma_2023C_merged.root']
+    mc_filenames = [file_path+'mc_DY_NLO_2023preBPIX_merged.root']
+    mcalt_filenames = [file_path+'mc_DY_LO_2023preBPIX_merged.root']
     measurement_cut = ('fabs(el_dz)<1.0&&fabs(el_dxy)<0.5'
                     +'&&((fabs(el_eta)<0.8 && el_pt>5 && el_pt<10 && el_hzzMVA>0.9266) || (fabs(el_eta)<0.8 && el_pt>10 && el_hzzMVA>0.3527) || (fabs(el_eta)>0.8 && el_eta<1.479 && el_pt>5 && el_pt<10 && el_hzzMVA>0.9138) || (fabs(el_eta)>0.8 && el_eta<1.479 && el_pt>10 && el_hzzMVA>0.2601) || (fabs(el_eta)>1.479 && el_pt>5 && el_pt<10 && el_hzzMVA>0.9682) || (fabs(el_eta)>1.479 && el_pt>10 && el_hzzMVA>-0.4963))')
     measurement_desc = 'H#rightarrow Z#gamma electron ID'
     preselection = 'tag_Ele_pt>30&&tag_Ele_abseta<2.17&&(tag_Ele_q+el_q)==0'
 
   elif (year == '2023BPix'):
-    file_path = '/eos/cms/store/group/phys_egamma/ec/tnpTuples/Prompt2023/'
-    data_filenames = [file_path+'data_2023D.root']
-    mc_filenames = [file_path+'DY_NLO_2023postBPIX.root']
-    mcalt_filenames = [file_path+'DY_LO_2023postBPIX.root']
+    file_path = "/eos/cms/store/group/phys_egamma/tnpTuples/jgrassi/2024-03-12/"
+    data_filenames = [file_path+'data_EGamma_2023D_merged.root']
+    mc_filenames = [file_path+'mc_DY_NLO_2023postBPIX_merged.root']
+    mcalt_filenames = [file_path+'mc_DY_LO_2023postBPIX_merged.root']
+    measurement_cut = ('fabs(el_dz)<1.0&&fabs(el_dxy)<0.5'
+                    +'&&((fabs(el_eta)<0.8 && el_pt>5 && el_pt<10 && el_hzzMVA>0.9266) || (fabs(el_eta)<0.8 && el_pt>10 && el_hzzMVA>0.3527) || (fabs(el_eta)>0.8 && el_eta<1.479 && el_pt>5 && el_pt<10 && el_hzzMVA>0.9138) || (fabs(el_eta)>0.8 && el_eta<1.479 && el_pt>10 && el_hzzMVA>0.2601) || (fabs(el_eta)>1.479 && el_pt>5 && el_pt<10 && el_hzzMVA>0.9682) || (fabs(el_eta)>1.479 && el_pt>10 && el_hzzMVA>-0.4963))')
+    preselection = 'tag_Ele_pt>30&&tag_Ele_abseta<2.17&&(tag_Ele_q+el_q)==0'
     preselection += '&&!(el_eta>-1.5&&el_eta<0.0&&el_phi>-1.2&&el_phi<-0.8)'
   elif (year == '2023BPixHole'):
-    file_path = '/eos/cms/store/group/phys_egamma/ec/tnpTuples/Prompt2023/'
-    data_filenames = [file_path+'data_2023D.root']
-    mc_filenames = [file_path+'DY_NLO_2023postBPIX.root']
-    mcalt_filenames = [file_path+'DY_LO_2023postBPIX.root']
+    file_path = "/eos/cms/store/group/phys_egamma/tnpTuples/jgrassi/2024-03-12/"
+    data_filenames = [file_path+'data_EGamma_2023D_merged.root']
+    mc_filenames = [file_path+'mc_DY_NLO_2023postBPIX_merged.root']
+    mcalt_filenames = [file_path+'mc_DY_LO_2023postBPIX_merged.root']
+    measurement_cut = ('fabs(el_dz)<1.0&&fabs(el_dxy)<0.5'
+                    +'&&((fabs(el_eta)<0.8 && el_pt>5 && el_pt<10 && el_hzzMVA>0.9266) || (fabs(el_eta)<0.8 && el_pt>10 && el_hzzMVA>0.3527) || (fabs(el_eta)>0.8 && el_eta<1.479 && el_pt>5 && el_pt<10 && el_hzzMVA>0.9138) || (fabs(el_eta)>0.8 && el_eta<1.479 && el_pt>10 && el_hzzMVA>0.2601) || (fabs(el_eta)>1.479 && el_pt>5 && el_pt<10 && el_hzzMVA>0.9682) || (fabs(el_eta)>1.479 && el_pt>10 && el_hzzMVA>-0.4963))')
+    preselection = 'tag_Ele_pt>30&&tag_Ele_abseta<2.17&&(tag_Ele_q+el_q)==0'
     preselection += '&&(el_eta>-1.5&&el_eta<0.0&&el_phi>-1.2&&el_phi<-0.8)'
 
   preselection_mc = preselection + '&&(mcTrue==1)'
