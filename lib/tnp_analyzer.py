@@ -16,6 +16,7 @@ from merge_pdfs import merge_pdfs
 from collections.abc import Callable
 
 ROOT.gROOT.LoadMacro('./lib/tnp_utils.cpp')
+ROOT.gROOT.LoadMacro('./lib/getpusf.cpp')
 
 #rng = ROOT.TRandom3()
 

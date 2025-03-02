@@ -31,6 +31,7 @@ if __name__=='__main__':
                  +'&&el_pt>7&&fabs(el_sc_eta)<2.5&&fabs(el_dz)<1.0'
                  +'&&fabs(el_dxy)<0.5&&passingMVA94XwpLooseisoV2')
   analyzer_name = 'eltrig27'
+  mc_weight = 'totWeight'
   year = args.year
   pt_binning = [7.0,25.0,26.0,27.0,28.0,29.0,31.0,35.0,50.0,100.0,500.0]
   eta_binning = [-2.5,-2.0,-1.5,-0.8,0.0,0.8,1.5,2.0,2.5]
@@ -95,6 +96,7 @@ if __name__=='__main__':
     data_filenames = [file_path+'data_EGamma_2022CD_merged.root']
     mc_filenames = [file_path+'mc_DY_NLO_2022preEE_merged.root']
     mcalt_filenames = [file_path+'mc_DY_LO_2022preEE_merged.root']
+    mc_weight = 'getpusf2022(truePU)*weight'
     if args.trig=='singleel':
       measurement_cut = 'passHltEle30WPTightGsf'
       measurement_desc = 'HLT_Ele30_WPTight'
@@ -110,6 +112,7 @@ if __name__=='__main__':
     data_filenames = [file_path+'data_EGamma_2022EFG_merged.root']
     mc_filenames = [file_path+'mc_DY_NLO_2022postEE_merged.root']
     mcalt_filenames = [file_path+'mc_DY_LO_2022postEE_merged.root']
+    mc_weight = 'getpusf2022EE(truePU)*weight'
     if args.trig=='singleel':
       measurement_cut = 'passHltEle30WPTightGsf'
       measurement_desc = 'HLT_Ele30_WPTight'
@@ -125,6 +128,7 @@ if __name__=='__main__':
     data_filenames = [file_path+'data_EGamma_2023C_merged.root']
     mc_filenames = [file_path+'mc_DY_NLO_2023preBPIX_merged.root']
     mcalt_filenames = [file_path+'mc_DY_LO_2023preBPIX_merged.root']
+    mc_weight = 'getpusf2023(truePU)*weight'
     if args.trig=='singleel':
       measurement_cut = 'passHltEle30WPTightGsf'
       measurement_desc = 'HLT_Ele30_WPTight'
@@ -142,6 +146,7 @@ if __name__=='__main__':
     data_filenames = [file_path+'data_EGamma_2023D_merged.root']
     mc_filenames = [file_path+'mc_DY_NLO_2023postBPIX_merged.root']
     mcalt_filenames = [file_path+'mc_DY_LO_2023postBPIX_merged.root']
+    mc_weight = 'getpusf2023BPix(truePU)*weight'
     if args.trig=='singleel':
       measurement_cut = 'passHltEle30WPTightGsf'
       measurement_desc = 'HLT_Ele30_WPTight'
@@ -158,6 +163,7 @@ if __name__=='__main__':
     data_filenames = [file_path+'data_EGamma_2023D_merged.root']
     mc_filenames = [file_path+'mc_DY_NLO_2023postBPIX_merged.root']
     mcalt_filenames = [file_path+'mc_DY_LO_2023postBPIX_merged.root']
+    mc_weight = 'getpusf2023BPix(truePU)*weight'
     if args.trig=='singleel':
       measurement_cut = 'passHltEle30WPTightGsf'
       measurement_desc = 'HLT_Ele30_WPTight'
@@ -173,7 +179,7 @@ if __name__=='__main__':
   eltrig_analyzer.year = year
   eltrig_analyzer.set_input_files(data_filenames,mc_filenames,mcalt_filenames,'tnpEleTrig/fitter_tree')
   eltrig_analyzer.set_fitting_variable('pair_mass','m_{ee} [GeV]',
-                                       weight_mc='totWeight')
+                                       weight_mc=mc_weight)
   eltrig_analyzer.set_measurement_variable(measurement_cut,measurement_desc)
   eltrig_analyzer.set_preselection(preselection,preselection_mc,preselection)
   if (year != '2023BPixHole'):

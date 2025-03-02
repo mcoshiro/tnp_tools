@@ -28,6 +28,7 @@ if __name__=='__main__':
                     +'&&passingMVA94XwpLooseisoV2')
   measurement_desc = 'H#rightarrow Z#gamma electron ID'
   preselection = 'tag_Ele_pt>40&&tag_Ele_abseta<2.17&&(tag_Ele_q+el_q)==0'
+  mc_weight = 'totWeight'
   year = args.year
   if (year == '2016'):
     file_path = '/eos/cms/store/group/phys_egamma/tnpTuples/rasharma/2021-02-10/UL2016postVFP/merged/'
@@ -63,6 +64,7 @@ if __name__=='__main__':
                     +'&&((fabs(el_eta)<0.8 && el_pt>5 && el_pt<10 && el_hzzMVA>0.9266) || (fabs(el_eta)<0.8 && el_pt>10 && el_hzzMVA>0.3527) || (fabs(el_eta)>0.8 && el_eta<1.479 && el_pt>5 && el_pt<10 && el_hzzMVA>0.9138) || (fabs(el_eta)>0.8 && el_eta<1.479 && el_pt>10 && el_hzzMVA>0.2601) || (fabs(el_eta)>1.479 && el_pt>5 && el_pt<10 && el_hzzMVA>0.9682) || (fabs(el_eta)>1.479 && el_pt>10 && el_hzzMVA>-0.4963))')
     measurement_desc = 'H#rightarrow Z#gamma electron ID'
     preselection = 'tag_Ele_pt>30&&tag_Ele_abseta<2.17&&(tag_Ele_q+el_q)==0'
+    mc_weight = 'getpusf2022(truePU)*weight'
   elif (year == '2022EE'):
     file_path = '/eos/cms/store/group/phys_egamma/tnpTuples/jgrassi/2024-03-12/'
     data_filenames = [file_path+'data_EGamma_2022EFG_merged.root']
@@ -72,6 +74,7 @@ if __name__=='__main__':
                     +'&&((fabs(el_eta)<0.8 && el_pt>5 && el_pt<10 && el_hzzMVA>0.9266) || (fabs(el_eta)<0.8 && el_pt>10 && el_hzzMVA>0.3527) || (fabs(el_eta)>0.8 && el_eta<1.479 && el_pt>5 && el_pt<10 && el_hzzMVA>0.9138) || (fabs(el_eta)>0.8 && el_eta<1.479 && el_pt>10 && el_hzzMVA>0.2601) || (fabs(el_eta)>1.479 && el_pt>5 && el_pt<10 && el_hzzMVA>0.9682) || (fabs(el_eta)>1.479 && el_pt>10 && el_hzzMVA>-0.4963))')
     measurement_desc = 'H#rightarrow Z#gamma electron ID'
     preselection = 'tag_Ele_pt>30&&tag_Ele_abseta<2.17&&(tag_Ele_q+el_q)==0'
+    mc_weight = 'getpusf2022EE(truePU)*weight'
   elif (year == '2023'):
     file_path = "/eos/cms/store/group/phys_egamma/tnpTuples/jgrassi/2024-03-12/"
     data_filenames = [file_path+'data_EGamma_2023C_merged.root']
@@ -81,7 +84,7 @@ if __name__=='__main__':
                     +'&&((fabs(el_eta)<0.8 && el_pt>5 && el_pt<10 && el_hzzMVA>0.9266) || (fabs(el_eta)<0.8 && el_pt>10 && el_hzzMVA>0.3527) || (fabs(el_eta)>0.8 && el_eta<1.479 && el_pt>5 && el_pt<10 && el_hzzMVA>0.9138) || (fabs(el_eta)>0.8 && el_eta<1.479 && el_pt>10 && el_hzzMVA>0.2601) || (fabs(el_eta)>1.479 && el_pt>5 && el_pt<10 && el_hzzMVA>0.9682) || (fabs(el_eta)>1.479 && el_pt>10 && el_hzzMVA>-0.4963))')
     measurement_desc = 'H#rightarrow Z#gamma electron ID'
     preselection = 'tag_Ele_pt>30&&tag_Ele_abseta<2.17&&(tag_Ele_q+el_q)==0'
-
+    mc_weight = 'getpusf2023(truePU)*weight'
   elif (year == '2023BPix'):
     file_path = "/eos/cms/store/group/phys_egamma/tnpTuples/jgrassi/2024-03-12/"
     data_filenames = [file_path+'data_EGamma_2023D_merged.root']
@@ -91,6 +94,7 @@ if __name__=='__main__':
                     +'&&((fabs(el_eta)<0.8 && el_pt>5 && el_pt<10 && el_hzzMVA>0.9266) || (fabs(el_eta)<0.8 && el_pt>10 && el_hzzMVA>0.3527) || (fabs(el_eta)>0.8 && el_eta<1.479 && el_pt>5 && el_pt<10 && el_hzzMVA>0.9138) || (fabs(el_eta)>0.8 && el_eta<1.479 && el_pt>10 && el_hzzMVA>0.2601) || (fabs(el_eta)>1.479 && el_pt>5 && el_pt<10 && el_hzzMVA>0.9682) || (fabs(el_eta)>1.479 && el_pt>10 && el_hzzMVA>-0.4963))')
     preselection = 'tag_Ele_pt>30&&tag_Ele_abseta<2.17&&(tag_Ele_q+el_q)==0'
     preselection += '&&!(el_eta>-1.5&&el_eta<0.0&&el_phi>-1.2&&el_phi<-0.8)'
+    mc_weight = 'getpusf2023BPIX(truePU)*weight'
   elif (year == '2023BPixHole'):
     file_path = "/eos/cms/store/group/phys_egamma/tnpTuples/jgrassi/2024-03-12/"
     data_filenames = [file_path+'data_EGamma_2023D_merged.root']
@@ -100,6 +104,7 @@ if __name__=='__main__':
                     +'&&((fabs(el_eta)<0.8 && el_pt>5 && el_pt<10 && el_hzzMVA>0.9266) || (fabs(el_eta)<0.8 && el_pt>10 && el_hzzMVA>0.3527) || (fabs(el_eta)>0.8 && el_eta<1.479 && el_pt>5 && el_pt<10 && el_hzzMVA>0.9138) || (fabs(el_eta)>0.8 && el_eta<1.479 && el_pt>10 && el_hzzMVA>0.2601) || (fabs(el_eta)>1.479 && el_pt>5 && el_pt<10 && el_hzzMVA>0.9682) || (fabs(el_eta)>1.479 && el_pt>10 && el_hzzMVA>-0.4963))')
     preselection = 'tag_Ele_pt>30&&tag_Ele_abseta<2.17&&(tag_Ele_q+el_q)==0'
     preselection += '&&(el_eta>-1.5&&el_eta<0.0&&el_phi>-1.2&&el_phi<-0.8)'
+    mc_weight = 'getpusf2023BPIX(truePU)*weight'
 
   preselection_mc = preselection + '&&(mcTrue==1)'
   
@@ -108,7 +113,7 @@ if __name__=='__main__':
   elid_analyzer.set_input_files(data_filenames,mc_filenames,mcalt_filenames,
                                 'tnpEleIDs/fitter_tree')
   elid_analyzer.set_fitting_variable('pair_mass','m_{ee} [GeV]',
-                                     weight_mc='totWeight')
+                                     weight_mc=mc_weight)
   elid_analyzer.set_measurement_variable(measurement_cut,measurement_desc)
   elid_analyzer.set_preselection(preselection,preselection_mc,preselection)
   if (year != '2023BPixHole'):
