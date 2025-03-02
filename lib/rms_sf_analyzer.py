@@ -1669,43 +1669,37 @@ class RmsSFAnalyzer:
             #avoid accessing the same ROOT file in multiple tnp_analyzers
             self.mc_nom_tnp_analyzer.close_file()
             self.data_nom_tnp_analyzer.close_file()
-            self.data_nom_tnp_analyzer.fit_histogram(starting_bin,starting_cat,
-                                                     self.nom_fn_name)
+            self.data_nom_tnp_analyzer.fit_histogram_wrapper(starting_bin,
+                starting_cat,self.nom_fn_name)
           elif (user_input[1] == 'nomcont'):
             #avoid accessing the same ROOT file in multiple tnp_analyzers
             self.mc_nom_tnp_analyzer.close_file()
             self.data_nom_tnp_analyzer.close_file()
-            self.data_nom_tnp_analyzer.fit_histogram(starting_bin,starting_cat,
-                                                     self.contingency_fn_name)
+            self.data_nom_tnp_analyzer.fit_histogram_wrapper(starting_bin,
+                starting_cat,self.contingency_fn_name)
           elif (user_input[1] == 'alts' or user_input[1] == 'altsignal'):
             self.data_altsig_tnp_analyzer.close_file()
-            self.data_altsig_tnp_analyzer.fit_histogram(starting_bin,
-                                                        starting_cat,
-                                                        self.alts_fn_name,
-                                                        self.alts_fn_init)
+            self.data_altsig_tnp_analyzer.fit_histogram_wrapper(starting_bin,
+                starting_cat,self.alts_fn_name,self.alts_fn_init)
           elif (user_input[1] == 'altscont'):
             self.data_altsig_tnp_analyzer.close_file()
-            self.data_altsig_tnp_analyzer.fit_histogram(starting_bin,
+            self.data_altsig_tnp_analyzer.fit_histogram_wrapper(starting_bin,
                 starting_cat,self.contingencyalts_fn_name,self.alts_fn_init)
           elif (user_input[1] == 'altb' or user_input[1] == 'altbackground'):
             #avoid accessing the same ROOT file in multiple tnp_analyzers
             self.mc_nom_tnp_analyzer.close_file()
             self.data_altbkg_tnp_analyzer.close_file()
-            self.data_altbkg_tnp_analyzer.fit_histogram(starting_bin,
-                                                        starting_cat,
-                                                        self.altb_fn_name)
+            self.data_altbkg_tnp_analyzer.fit_histogram_wrapper(starting_bin,
+                starting_cat,self.altb_fn_name)
           elif (user_input[1] == 'altsb' or 
                 user_input[1] == 'altsignalbackground'):
             self.data_altsigbkg_tnp_analyzer.close_file()
-            self.data_altsigbkg_tnp_analyzer.fit_histogram(starting_bin,
-                                                           starting_cat,
-                                                           self.altsb_fn_name,
-                                                           self.alts_fn_init)
+            self.data_altsigbkg_tnp_analyzer.fit_histogram_wrapper(
+                starting_bin,starting_cat,self.altsb_fn_name,self.alts_fn_init)
           elif (user_input[1] == 'mc' or user_input[1] == 'mcalt'):
             self.mc_nom_tnp_analyzer.close_file()
-            self.mc_nom_tnp_analyzer.fit_histogram(starting_bin,
-                                                   starting_cat,
-                                                   self.alts_fn_name_sa)
+            self.mc_nom_tnp_analyzer.fit_histogram_wrapper(starting_bin,
+                starting_cat, self.alts_fn_name_sa)
           else:
             print('ERROR: unrecognized argument to f(it)')
       elif (user_input[0] == 'o' or user_input[0] == 'output'):

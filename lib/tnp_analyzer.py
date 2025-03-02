@@ -9,16 +9,14 @@ For CMS members, see https://twiki.cern.ch/twiki/bin/view/CMS/ElectronScaleFacto
 import json
 import math
 import os
-import random
 import ROOT
+from functools import partial
 from tnp_utils import *
 from merge_pdfs import merge_pdfs
 from collections.abc import Callable
+from interactive_fit import InteractiveFit
 
-ROOT.gROOT.LoadMacro('./lib/tnp_utils.cpp')
 ROOT.gROOT.LoadMacro('./lib/getpusf.cpp')
-
-#rng = ROOT.TRandom3()
 
 class TnpAnalyzer:
   '''Class used to do a T&P analysis. See scripts/example.py for example usage.
@@ -371,19 +369,16 @@ class TnpAnalyzer:
       pass_hist_ptrs[ibin].Write()
       fail_hist_ptrs[ibin].Write()
 
-  def fit_histogram(self, ibin_str: str, pass_probe: str, model: str, 
-                    param_initializer: str=''):
-    '''Performs interactive fit to data
+  def fit_histogram_wrapper(self, ibin_str: str, pass_probe: str, model: str, 
+                            param_initializer: str=''):
+    """Performs interactive fit to data
 
     Args:
       ibin_str: bin to fit
       pass_probe: pass or fail
       model: model name
       param_initializer: parameter initializer name
-    '''
-
-    self.check_initialization()
-    self.initialize_files_directories()
+    """
     #do initial checks
     ibin = 0
     try:
@@ -397,11 +392,6 @@ class TnpAnalyzer:
     if pass_probe not in ['pass','p','P','fail','f','F']:
       print('ERROR: <pass> parameter must be (p)ass or (f)ail.')
       return
-    pass_bool = False
-    pass_fail = 'fail'
-    if pass_probe in ['pass','p','P']:
-      pass_bool = True
-      pass_fail = 'pass'
     if not model in self.model_initializers:
       print('ERROR: unknown fit model, aborting fit.')
       return
@@ -409,10 +399,49 @@ class TnpAnalyzer:
       if not param_initializer=='':
         print('ERROR: unknown param initializer, aborting fit.')
         return
+    exit_code = 1
+    while exit_code==1:
+      exit_code = self.fit_histogram(ibin, pass_probe, model, 
+                                     param_initializer)
+      if exit_code == 1:
+        if (ibin != (self.nbins-1)):
+          ibin += 1
+        else:
+          if (pass_probe in ['pass','p','P']):
+            ibin = 0
+            pass_probe = 'f'
+          else:
+            exit_code = 0
+      if exit_code==0:
+        print('Exiting interactive fitter bin {} category {}.'
+            .format(ibin_str, pass_probe))
+
+  def fit_histogram(self, ibin: int, pass_probe: str, model: str, 
+                    param_initializer: str='') -> int:
+    """Performs interactive fit to data
+
+    Args:
+      ibin: bin to fit
+      pass_probe: pass or fail
+      model: model name
+      param_initializer: parameter initializer name
+
+    Returns:
+      0 to exit, 1 to go to next fit
+    """
+
+    self.check_initialization()
+    self.initialize_files_directories()
+    #do initial checks
+    pass_bool = False
+    pass_fail = 'fail'
+    if pass_probe in ['pass','p','P']:
+      pass_bool = True
+      pass_fail = 'pass'
     hist_name = 'hist_'+pass_fail+'_bin{}'.format(ibin)
     if not self.temp_file.GetListOfKeys().Contains(hist_name):
       print('ERROR: Please produce histograms before calling fit.')
-      return
+      return 0
 
     #initialize workspace
     fit_range_lower, fit_range_upper = self.get_fit_range()
@@ -435,172 +464,18 @@ class TnpAnalyzer:
       self.param_initializers[param_initializer](ibin, pass_bool, workspace)
 
     #run interactive fit
-    exit_loop = False
-    fit_status = 0
     canvas = ROOT.TCanvas()
-    data = workspace.data('data')
-    pdf_sb = workspace.pdf('pdf_sb')
-    param_names = workspace_vars_to_list(workspace)
-    param_names.remove('fit_var')
     print('Fitting '+pass_fail+' bin {}'.format(ibin))
-
-    #do one fit before starting interactive session
-    workspace.saveSnapshot('prefit',','.join(param_names))
-    fit_result_ptr = pdf_sb.fitTo(data,ROOT.RooFit.Save(True),
-                                  ROOT.RooFit.Range('fitMassRange'))
-    fit_status = fit_result_ptr.status()
-    ROOT.free_memory_RooFitResult(fit_result_ptr)
-    print('Fit status: '+str(fit_status))
-    self.make_simple_tnp_plot(workspace, canvas)
-
-    while not exit_loop:
-      user_input = input('>:')
-      user_input = user_input.split()
-      if len(user_input)<1:
-        continue
-      elif user_input[0]=='list' or user_input[0]=='l':
-        workspace_vars = workspace_vars_to_list(workspace)
-        for param_name in workspace_vars:
-          print(param_name+': '+str(workspace.var(param_name).getValV()))
-        #workspace.Print('v') 
-      elif user_input[0]=='help' or user_input[0]=='h':
-        print('This is an interactive fitting session for bin {} category {}.'
-              .format(ibin_str, pass_probe))
-        print('Commands include:')
-        print('f(it)                    attempt a fit')
-        print('l(ist)                   display values of variables')
-        print('c(onstant) <var> <value> set a value to constant or not')
-        print('n(ext)                   finish fit and proceed to next bin')
-        print('q(uit)                   exit interactive fitting session')
-        print('q(uit)!                  exit session without saving result')
-        print('j(son) <s/l> <fname>     saves or loads parameters to JSON file')
-        print('r(evert)                 revert to prefit parameter values')
-        print('ra(ndomize)              randomize non-constant values')
-        print('s(et) <var> <value>      set variable <var> to <value>')
-        print('w(rite) <fname>          write current canvas to a file')
-      elif user_input[0]=='randomize' or user_input[0]=='ra':
-        workspace_vars = workspace_vars_to_list(workspace)
-        for param_name in workspace_vars:
-          if not workspace.var(param_name).isConstant():
-            param_max = workspace.var(param_name).getMax()
-            param_min = workspace.var(param_name).getMin()
-            workspace.var(param_name).setVal(random.uniform(param_min, 
-                                                            param_max))
-      elif user_input[0]=='constant' or user_input[0]=='c':
-        if len(user_input)<3:
-          print('ERROR: (c)onstant takes two arguments: set <var> <value>')
-          continue
-        if not (user_input[1] in param_names):
-          print('ERROR: unknown parameter '+user_input[1])
-          continue
-        constant_value = True
-        if (user_input[2] == 'False' or user_input[2] == 'false'
-            or user_input[2] == 'F' or user_input[2] == 'f'):
-          constant_value = False
-        workspace.var(user_input[1]).setConstant(constant_value)
-        if len(user_input)>=4:
-          try:
-            float(user_input[3])
-            workspace.var(user_input[1]).setVal(float(user_input[3]))
-            self.make_simple_tnp_plot(workspace, canvas)
-          except ValueError:
-            print('ERROR: Unable to cast value, skipping input.')
-      elif user_input[0]=='set' or user_input[0]=='s':
-        if len(user_input)<3:
-          print('ERROR: (s)et takes two arguments: set <var> <value>')
-          continue
-        if not (user_input[1] in param_names):
-          print('ERROR: unknown parameter '+user_input[1])
-          continue
-        try:
-          float(user_input[2])
-          workspace.var(user_input[1]).setVal(float(user_input[2]))
-          self.make_simple_tnp_plot(workspace, canvas)
-        except ValueError:
-          print('ERROR: Unable to cast value, skipping input.')
-      elif user_input[0]=='json' or user_input[0]=='j':
-        if len(user_input)<3:
-          print('ERROR: (j)son takes two arguments: json <s/l> <fname>')
-          continue
-        if not user_input[1] in ['s','save','l','load','S','L']:
-          print('ERROR: (j)son second argument must be (s)ave or (l)oad')
-          continue
-        is_save = (user_input[1] in ['s','save','S'])
-        filename = user_input[2] 
-        if (not is_save) and (not os.path.exists(filename)):
-          print('ERROR: File not found.')
-          continue
-        if is_save and os.path.exists(filename):
-          print('WARNING: file already exists, enter "y" to overwrite')
-          user_input_2 = input()
-          if user_input_2 != 'y':
-            print('Aborting write.')
-            continue
-        if (is_save):
-          param_dict = dict()
-          for param_name in param_names:
-            param_dict[param_name] = workspace.var(param_name).getValV()
-          with open(filename,'w') as output_file:
-            output_file.write(json.dumps(param_dict))
-        if (not is_save):
-          with open(filename,'r') as input_file:
-            param_dict = json.loads(input_file.read())
-            for param_name in param_dict:
-              workspace.var(param_name).setVal(param_dict[param_name])
-          self.make_simple_tnp_plot(workspace, canvas)
-      elif user_input[0]=='fit' or user_input[0]=='f':
-        workspace.saveSnapshot('prefit',','.join(param_names))
-        fit_result_ptr = pdf_sb.fitTo(data,ROOT.RooFit.Save(True),
-                                      ROOT.RooFit.Range('fitMassRange'))
-        fit_status = fit_result_ptr.status()
-        ROOT.free_memory_RooFitResult(fit_result_ptr)
-        print('Fit status: '+str(fit_status))
-        self.make_simple_tnp_plot(workspace, canvas)
-      elif user_input[0]=='revert' or user_input[0]=='r':
-        workspace.loadSnapshot('prefit')
-        self.make_simple_tnp_plot(workspace, canvas)
-      elif user_input[0]=='write' or user_input[0]=='w':
-        if len(user_input)<3:
-          print('ERROR: (w)rite takes one argument: write <fname>')
-          continue
-        canvas.SaveAs(user_input[1])
-      elif user_input[0]=='quit!' or user_input[0]=='q!':
-        exit_loop = True
-      elif (user_input[0]=='quit' or user_input[0]=='q' or user_input[0]=='n' or
-           user_input[0]=='next'):
-        #originally was going to save Workspace, but ROOT is too unstable, so
-        #just saving fit parameter info to recreate later
-        filename = ('out/'+self.temp_name+'/fitinfo_bin'+str(ibin)+'_'
-                    +pass_fail+'.json')
-        if os.path.exists(filename):
-          print('WARNING: output file already exists, enter "y" to overwrite')
-          user_input_2 = input()
-          if user_input_2 != 'y':
-            print('Aborting write.')
-            continue
-        param_dict = dict()
-        for param_name in param_names:
-          param_dict[param_name] = workspace.var(param_name).getValV()
-          param_dict[param_name+'_unc'] = workspace.var(param_name).getError()
-        param_dict['fit_status'] = fit_status
-        param_dict['fit_model'] = model
-        with open(filename,'w') as output_file:
-          output_file.write(json.dumps(param_dict))
-        if user_input[0]=='n' or user_input[0]=='next':
-          if (ibin != self.nbins-1):
-            self.fit_histogram(str(ibin+1), pass_probe, model, 
-                               param_initializer)
-          else:
-            if (pass_probe in ['pass','p','P']):
-             self.fit_histogram('0', 'f', model, 
-                                param_initializer)
-            else:
-              print('Exiting interactive fitter bin {} category {}.'
-                  .format(ibin_str, pass_probe))
-        else:
-          print('Exiting interactive fitter bin {} category {}.'
-              .format(ibin_str, pass_probe))
-        exit_loop = True
+    plot_callback = partial(self.make_simple_tnp_plot,workspace,canvas)
+    output_filename = 'out/{}/fitinfo_bin{}_{}.json'.format(self.temp_name,
+                                                            str(ibin),
+                                                            pass_fail)
+    help_str = (('This is an interactive fitting session for bin {} '
+                 +'category {}.').format(ibin, pass_probe))
+    fit_session = InteractiveFit(workspace, plot_callback, canvas.SaveAs,
+                                 output_filename, model, help_str)
+    fit_session.interactive_fit(['f'])
+    return fit_session.run_interactive()
 
   def draw_fit_set(self, ibin: int, filename: str, 
                    canvas_size: int=320) -> tuple[float,float]:
@@ -911,9 +786,10 @@ class TnpAnalyzer:
       elif (user_input[0] == 'f' or user_input[0] == 'fit'):
         print('Beginning interactive fitting session.')
         if len(user_input)>=5:
-          self.fit_histogram(user_input[1],user_input[2],user_input[3],user_input[4])
+          self.fit_histogram_wrapper(user_input[1],user_input[2],user_input[3],
+                                     user_input[4])
         elif len(user_input)==4:
-          self.fit_histogram(user_input[1],user_input[2],user_input[3])
+          self.fit_histogram_wrapper(user_input[1],user_input[2],user_input[3])
         else:
           print('ERROR: (f)it requires at least 3 arguments')
       elif (user_input[0] == 'o' or user_input[0] == 'output'):
