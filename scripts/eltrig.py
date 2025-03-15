@@ -174,7 +174,6 @@ if __name__=='__main__':
     if args.trig=='diel12':
       pt_binning = [7.0,14.0,25.0,50.0,500.0]
 
-
   analyzer_name = 'hzg_'+analyzer_name+'_'+year
   preselection_mc = preselection + '&&(mcTrue==1)'
   
