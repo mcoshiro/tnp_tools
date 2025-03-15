@@ -15,13 +15,15 @@ if __name__=='__main__':
   args = argument_parser.parse_args()
 
   #default: 2016APV
-  data_filenames = ['/data2/oshiro/ntuples/2016APV/Run2016B_L1matched.root',
-                    '/data2/oshiro/ntuples/2016APV/Run2016C_L1matched.root',
-                    '/data2/oshiro/ntuples/2016APV/Run2016D_L1matched.root',
-                    '/data2/oshiro/ntuples/2016APV/Run2016E_L1matched.root',
-                    '/data2/oshiro/ntuples/2016APV/Run2016F_L1matched.root']
-  mc_filenames = ['/data2/oshiro/ntuples/2016APV/DY_NLO_L1matched.root']
-  mcalt_filenames = ['/data2/oshiro/ntuples/2016APV/DY_LO_L1matched.root']
+  file_path = ('/eos/cms/store/group/phys_egamma/tnpTuples/rasharma/'
+               '2021-02-10/UL2016preVFP/merged/')
+  data_filenames = [file_path+'Run2016B_L1matched.root',
+                    file_path+'Run2016C_L1matched.root',
+                    file_path+'Run2016D_L1matched.root',
+                    file_path+'Run2016E_L1matched.root',
+                    file_path+'Run2016F_L1matched.root']
+  mc_filenames = [file_path+'DY_NLO_L1matched.root']
+  mcalt_filenames = [file_path+'DY_LO_L1matched.root']
   measurement_cut = ('passingMVA94XV2wp80')
   measurement_desc = 'Photon ID WP80'
   preselection = 'tag_Ele_pt>40&&tag_Ele_abseta<2.17&&((ph_sc_abseta<1.4442)||(ph_sc_abseta>.1566&&ph_sc_abseta<2.5))'
@@ -51,10 +53,20 @@ if __name__=='__main__':
                       file_path+'Run2018D.root']
     mc_filenames = [file_path+'DY_NLO.root']
     mcalt_filenames = [file_path+'DY_LO.root']
-  elif (year == '2023BPix'):
-    preselection += '&&!(el_eta>-1.5&&el_eta<0.0&&el_phi>-1.2&&el_phi<-0.8)'
-  elif (year == '2023BPixHole'):
-    preselection += '&&(el_eta>-1.5&&el_eta<0.0&&el_phi>-1.2&&el_phi<-0.8)'
+  elif (year == '2022'):
+    file_path = '/eos/cms/store/group/phys_egamma/ec/nkasarag/EGM_comm/TnP_samples/2022/'
+    data_filenames = [file_path+'data/merged_Run2022_BCD_ReReco_updated.root']
+    mc_filenames = [file_path+'sim/DY_NLO/merged_Run3Summer22MiniAODv4-130X_mcRun3_2022_realistic_v5-v2.root']
+    mcalt_filenames = [file_path+'sim/DY_LO/merged_DYJetsToLL_M_50_Run3Summer22MiniAODv4-forPOG_130X_mcRun3_2022_realistic_v5-v2.root']
+  elif (year == '2022EE'):
+    file_path = '/eos/cms/store/group/phys_egamma/ec/nkasarag/EGM_comm/TnP_samples/2022/'
+    data_filenames = [file_path+'data/merged_Run2022_EReReco_FG_PromptReco_updated.root']
+    mc_filenames = [file_path+'sim/DY_NLO/merged_Run3Summer22EEMiniAODv4-130X_mcRun3_2022_realistic_postEE_v6-v2.root']
+    mcalt_filenames = [file_path+'sim/DY_LO/merged_DYJetsToLL_M_50_Run3Summer22EEMiniAODv4-forPOG_130X_mcRun3_2022_realistic_postEE_v6-v2.root']
+  #elif (year == '2023BPix'):
+  #  preselection += '&&!(el_eta>-1.5&&el_eta<0.0&&el_phi>-1.2&&el_phi<-0.8)'
+  #elif (year == '2023BPixHole'):
+  #  preselection += '&&(el_eta>-1.5&&el_eta<0.0&&el_phi>-1.2&&el_phi<-0.8)'
   
   elid_analyzer = RmsSFAnalyzer('hzg_phidel_{}'.format(year))
   elid_analyzer.year = year
@@ -65,7 +77,10 @@ if __name__=='__main__':
   elid_analyzer.set_preselection(preselection,preselection_mc,preselection)
   elid_analyzer.mc_nom_tnp_analyzer.fit_var_weight = 'totWeight'
   elid_analyzer.mc_alt_tnp_analyzer.fit_var_weight = 'totWeight'
-  elid_analyzer.add_standard_binning([15.0,20.0,35.0,50.0,80.0],
+  #elid_analyzer.add_standard_binning([15.0,20.0,35.0,50.0,80.0],
+  #    [-2.5,-2.0,-1.5,-0.8,0.0,0.8,1.5,2.0,2.5],'ph_et',
+  #    'ph_sc_eta')
+  elid_analyzer.add_standard_binning([15.0,20.0],
       [-2.5,-2.0,-1.5,-0.8,0.0,0.8,1.5,2.0,2.5],'ph_et',
       'ph_sc_eta')
   elid_analyzer.run_interactive()
