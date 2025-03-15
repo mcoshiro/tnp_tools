@@ -26,7 +26,8 @@ LUMI_TAGS = {'2016APV' : [(20,13)],
              '2022' : [(8,13.6)],
              '2022EE' : [(27,13.6)],
              '2023' : [(18,13.6)],
-             '2023BPix' : [(10,13.6)]}
+             '2023BPix' : [(10,13.6)],
+             '2023BPixHole' : [(10,13.6)]}
 
 CMS_COLORS = [ROOT.TColor.GetColor('#3f90da'), 
               ROOT.TColor.GetColor('#ffa90e'),

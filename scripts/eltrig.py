@@ -168,9 +168,12 @@ if __name__=='__main__':
       measurement_cut = 'passHltEle30WPTightGsf'
       measurement_desc = 'HLT_Ele30_WPTight'
       analyzer_name = 'eltrig30'
-      pt_binning = [7.0,31.0,32.0,33.0,34.0,35.0,38.0,45.0,80.0,120.0,500.0]
-      eta_binning = [-2.5,-2.0,-1.5,-0.8,0.0,0.8,1.5,2.0,2.5]
-      gappt_binning = [7.0,30.0,45.0,500.0]
+      pt_binning = [7.0,30.0,40.0,50.0,500.0]
+    if args.trig=='diel23':
+      pt_binning = [7.0,23.0,30.0,50.0,500.0]
+    if args.trig=='diel12':
+      pt_binning = [7.0,14.0,25.0,50.0,500.0]
+
 
   analyzer_name = 'hzg_'+analyzer_name+'_'+year
   preselection_mc = preselection + '&&(mcTrue==1)'

@@ -130,6 +130,7 @@ if __name__=='__main__':
         df = df.Filter('(el_pflavor[0]==1&&el_pflavor[1]==1)')
       df = df.Define('probe_el_pt','el_pt['+index+']')
       df = df.Define('probe_el_eta','el_eta['+index+']')
+      df = df.Define('probe_el_phi','el_phi['+index+']')
       df = df.Define('probe_el_miniso','el_miniso['+index+']')
       df = df.Define('pair_mass', 'll_m[0]')
 
@@ -139,6 +140,7 @@ if __name__=='__main__':
         df = df.Define('w_year',str(LUMI[year]))
         df = df.Define('w_lumiyearpu','w_lumi*w_year*w_pu')
       df.Snapshot('tree',output_filename,['probe_el_pt','probe_el_eta',
+                                          'probe_el_phi',
                                           'probe_el_miniso','pair_mass',
                                           'w_lumiyearpu'])
 

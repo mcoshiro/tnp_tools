@@ -414,7 +414,7 @@ class TnpAnalyzer:
             exit_code = 0
       if exit_code==0:
         print('Exiting interactive fitter bin {} category {}.'
-            .format(ibin_str, pass_probe))
+            .format(ibin, pass_probe))
 
   def fit_histogram(self, ibin: int, pass_probe: str, model: str, 
                     param_initializer: str='') -> int:

@@ -121,7 +121,7 @@ if __name__=='__main__':
         [-2.5,-2.0,-1.5,-0.8,0.0,0.8,1.5,2.0,2.5],[7.0,35.0,500.0],'el_pt',
         'el_sc_eta')
   else:
-    elid_analyzer.add_standard_binning([7.0,15.0,20.0,35.0,50.0,100.0,500.0],
+    elid_analyzer.add_standard_binning([7.0,20.0,35.0,50.0,500.0],
         [-1.566,-1.4442,-0.8,0.0],'el_pt','el_sc_eta')
   elid_analyzer.run_interactive()
 

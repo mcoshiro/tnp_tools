@@ -89,7 +89,6 @@ if __name__=='__main__':
       description='Converts NanoAOD to TnP n-tuple')
   argument_parser.add_argument('-i','--input_filename')
   argument_parser.add_argument('-o','--output_filename')
-  argument_parser.add_argument('-m','--mc',action='store_true')
   args = argument_parser.parse_args()
 
   year = get_year(args.input_filename)
@@ -99,7 +98,7 @@ if __name__=='__main__':
   df = df.Filter('nmu==2&nll>=1')
   df = df.Filter('(trig_single_mu&&mu_pt[0]>28)'
                  +'||(trig_double_mu&&mu_pt[0]>20&&mu_pt[1]>10)')
-  if args.mc:
+  if not is_data:
     df = df.Define('probe_ph_idx','get_probe_photon_idx_mc(photon_pt,'
                    +'photon_isScEtaEB,photon_isScEtaEE,photon_drmin,'
                    +'photon_pflavor)')
@@ -112,6 +111,7 @@ if __name__=='__main__':
   df = df.Define('probe_ph_abseta','fabs(probe_ph_eta)')
   df = df.Define('probe_ph_idmva','photon_idmva[probe_ph_idx]')
   df = df.Define('probe_ph_id80','photon_id80[probe_ph_idx]')
+  df = df.Define('ll_mass','ll_m[0]')
   df = df.Define('pair_mass','get_mllg(ll_pt, ll_eta, ll_phi, ll_m, photon_pt,'
                  +'photon_eta, photon_phi, probe_ph_idx)')
   if is_data:
@@ -121,6 +121,6 @@ if __name__=='__main__':
     df = df.Define('w_lumiyearpu','w_lumi*w_year*w_pu')
   df.Snapshot('tree',args.output_filename,['probe_ph_pt','probe_ph_eta',
                                            'probe_ph_abseta','probe_ph_idmva',
-                                           'probe_ph_id80','pair_mass',
-                                           'w_lumiyearpu'])
+                                           'probe_ph_id80','ll_mass',
+                                           'pair_mass','w_lumiyearpu'])
 

@@ -215,10 +215,12 @@ def calculate_sfs(eff_dat1: float, eff_dat2: float, eff_dat3: float,
   if not (eff_sim1<=0.0 or eff_sim2<=0.0):
     sfp1 = eff_dat1/eff_sim1
     sfp2 = eff_dat2/eff_sim1
-    sfp3 = eff_dat3/eff_sim1
-    sfp4 = eff_dat4/eff_sim1
-    sfpm = statistics.mean([sfp1,sfp2,sfp3,sfp4])
-    sfprms = math.hypot(sfp1-sfpm,sfp2-sfpm,sfp3-sfpm,sfp4-sfpm)/math.sqrt(3.0)
+    #sfp3 = eff_dat3/eff_sim1
+    #sfp4 = eff_dat4/eff_sim1
+    #sfpm = statistics.mean([sfp1,sfp2,sfp3,sfp4])
+    #sfprms = math.hypot(sfp1-sfpm,sfp2-sfpm,sfp3-sfpm,sfp4-sfpm)/math.sqrt(3.0)
+    sfpm = statistics.mean([sfp1,sfp2])
+    sfprms = math.hypot(sfp1-sfpm,sfp2-sfpm)/math.sqrt(1.0)
     sfpdstat = sfp1*unc_dat1/eff_dat1
     sfpmstat = sfp1*unc_sim1/eff_sim1
     sfpmcalt = abs(sfp1-eff_dat1/eff_sim2)
@@ -232,10 +234,12 @@ def calculate_sfs(eff_dat1: float, eff_dat2: float, eff_dat3: float,
       nonzero_unc_sim = unc_sim2
     sfp1 = eff_dat1/nonzero_eff_sim
     sfp2 = eff_dat2/nonzero_eff_sim
-    sfp3 = eff_dat3/nonzero_eff_sim
-    sfp4 = eff_dat4/nonzero_eff_sim
-    sfpm = statistics.mean([sfp1,sfp2,sfp3,sfp4])
-    sfprms = math.hypot(sfp1-sfpm,sfp2-sfpm,sfp3-sfpm,sfp4-sfpm)/math.sqrt(3.0)
+    #sfp3 = eff_dat3/nonzero_eff_sim
+    #sfp4 = eff_dat4/nonzero_eff_sim
+    #sfpm = statistics.mean([sfp1,sfp2,sfp3,sfp4])
+    #sfprms = math.hypot(sfp1-sfpm,sfp2-sfpm,sfp3-sfpm,sfp4-sfpm)/math.sqrt(3.0)
+    sfpm = statistics.mean([sfp1,sfp2])
+    sfprms = math.hypot(sfp1-sfpm,sfp2-sfpm)/math.sqrt(1.0)
     sfpdstat = sfp1*unc_dat1/eff_dat1
     sfpmstat = sfp1*nonzero_unc_sim/nonzero_eff_sim
     pass_sf = sfpm
@@ -246,10 +250,12 @@ def calculate_sfs(eff_dat1: float, eff_dat2: float, eff_dat3: float,
     nonzero_unc_sim = unc_sim1
     sfp1 = eff_dat1/nonzero_eff_sim
     sfp2 = eff_dat2/nonzero_eff_sim
-    sfp3 = eff_dat3/nonzero_eff_sim
-    sfp4 = eff_dat4/nonzero_eff_sim
-    sfpm = statistics.mean([sfp1,sfp2,sfp3,sfp4])
-    sfprms = math.hypot(sfp1-sfpm,sfp2-sfpm,sfp3-sfpm,sfp4-sfpm)/math.sqrt(3.0)
+    #sfp3 = eff_dat3/nonzero_eff_sim
+    #sfp4 = eff_dat4/nonzero_eff_sim
+    #sfpm = statistics.mean([sfp1,sfp2,sfp3,sfp4])
+    #sfprms = math.hypot(sfp1-sfpm,sfp2-sfpm,sfp3-sfpm,sfp4-sfpm)/math.sqrt(3.0)
+    sfpm = statistics.mean([sfp1,sfp2])
+    sfprms = math.hypot(sfp1-sfpm,sfp2-sfpm)/math.sqrt(1.0)
     sfpdstat = sfp1*unc_dat1/eff_dat1
     sfpmstat = sfp1*nonzero_unc_sim/nonzero_eff_sim
     pass_sf = sfpm
@@ -258,10 +264,12 @@ def calculate_sfs(eff_dat1: float, eff_dat2: float, eff_dat3: float,
   if not (eff_sim1>=1.0 or eff_sim2>=1.0):
     sff1 = (1.0-eff_dat1)/(1.0-eff_sim1)
     sff2 = (1.0-eff_dat2)/(1.0-eff_sim1)
-    sff3 = (1.0-eff_dat3)/(1.0-eff_sim1)
-    sff4 = (1.0-eff_dat4)/(1.0-eff_sim1)
-    sffm = statistics.mean([sff1,sff2,sff3,sff4])
-    sffrms = math.hypot(sff1-sffm,sff2-sffm,sff3-sffm,sff4-sffm)/math.sqrt(3.0)
+    #sff3 = (1.0-eff_dat3)/(1.0-eff_sim1)
+    #sff4 = (1.0-eff_dat4)/(1.0-eff_sim1)
+    #sffm = statistics.mean([sff1,sff2,sff3,sff4])
+    #sffrms = math.hypot(sff1-sffm,sff2-sffm,sff3-sffm,sff4-sffm)/math.sqrt(3.0)
+    sffm = statistics.mean([sff1,sff2])
+    sffrms = math.hypot(sff1-sffm,sff2-sffm)/math.sqrt(3.0)
     sffdstat = sff1*unc_dat1/(1.0-eff_dat1)
     sffmstat = sff1*unc_sim1/(1.0-eff_sim1)
     sffmcalt = abs(sff1-(1.0-eff_dat1)/(1.0-eff_sim2))
@@ -275,10 +283,12 @@ def calculate_sfs(eff_dat1: float, eff_dat2: float, eff_dat3: float,
       nonunity_unc_sim = unc_sim2
     sff1 = (1.0-eff_dat1)/(1.0-nonunity_eff_sim)
     sff2 = (1.0-eff_dat2)/(1.0-nonunity_eff_sim)
-    sff3 = (1.0-eff_dat3)/(1.0-nonunity_eff_sim)
-    sff4 = (1.0-eff_dat4)/(1.0-nonunity_eff_sim)
-    sffm = statistics.mean([sff1,sff2,sff3,sff4])
-    sffrms = math.hypot(sff1-sffm,sff2-sffm,sff3-sffm,sff4-sffm)/math.sqrt(3.0)
+    #sff3 = (1.0-eff_dat3)/(1.0-nonunity_eff_sim)
+    #sff4 = (1.0-eff_dat4)/(1.0-nonunity_eff_sim)
+    #sffm = statistics.mean([sff1,sff2,sff3,sff4])
+    #sffrms = math.hypot(sff1-sffm,sff2-sffm,sff3-sffm,sff4-sffm)/math.sqrt(3.0)
+    sffm = statistics.mean([sff1,sff2])
+    sffrms = math.hypot(sff1-sffm,sff2-sffm)/math.sqrt(3.0)
     sffdstat = sff1*unc_dat1/(1.0-eff_dat1)
     sffmstat = sff1*nonunity_unc_sim/(1.0-nonunity_eff_sim)
     fail_sf = sffm
@@ -906,6 +916,9 @@ class RmsSFAnalyzer:
     plot_types = ['eff_data','eff_mc','eff_ptbinned','eff_etabinned','sfpass',
                   'sfpass_unc','sfpass_ptbinned','sfpass_etabinned','sffail',
                   'sffail_unc','sffail_ptbinned','sffail_etabinned']
+    if self.binning_type=='std_gap':
+      plot_types += ['eff_gapptbinned','sfpass_gapptbinned',
+                     'sffail_gapptbinned']
     for plot_type in plot_types:
       subprocess.run(('mv out/{0}/{0}_{1}.png out/web_{0}/'.format(self.name,
                       plot_type)).split())
@@ -913,8 +926,12 @@ class RmsSFAnalyzer:
     nbins = self.data_nom_tnp_analyzer.nbins
 
     #setup web page/directory
-    with open('data/index_template.html','r') as template_file:
-      index_content = template_file.read()
+    if self.binning_type=='std_gap':
+      with open('data/index_template_gap.html','r') as template_file:
+        index_content = template_file.read()
+    else:
+      with open('data/index_template.html','r') as template_file:
+        index_content = template_file.read()
     index_content = index_content.replace('{0}',self.name)
     with open('{0}/index.html'.format(webdir),'w') as webindex_file:
       webindex_file.write(index_content)

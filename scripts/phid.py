@@ -22,7 +22,7 @@ if __name__=='__main__':
   mcalt_filenames = ['/data2/oshiro/ntuples/2016APV/DY_LO_L1matched.root']
   measurement_cut = 'probe_ph_id80'
   measurement_desc = 'Fall17v2 Photon ID WP80'
-  preselection = '1'
+  preselection = 'll_mass<75'
   year = args.year
   if year=='2018':
     data_filenames = ['/data2/oshiro/ntuples/2018/phwp80skim_data.root']
@@ -46,5 +46,5 @@ if __name__=='__main__':
   phid_analyzer.set_preselection(preselection,preselection,preselection)
   phid_analyzer.add_standard_binning(pt_binning,eta_binning,
                                      'probe_ph_pt','probe_ph_eta')
-  phid_analyzer.run_interactive(gamma_add_gauss=True)
+  phid_analyzer.run_interactive()
 
