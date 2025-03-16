@@ -107,6 +107,7 @@ if __name__=='__main__':
                    +'photon_isScEtaEB,photon_isScEtaEE,photon_drmin)')
   df = df.Filter('probe_ph_idx != -1')
   df = df.Define('probe_ph_pt','photon_pt[probe_ph_idx]')
+  df = df.Filter('probe_ph_pt>15&&probe_ph_pt<20')
   df = df.Define('probe_ph_eta','photon_eta[probe_ph_idx]')
   df = df.Define('probe_ph_abseta','fabs(probe_ph_eta)')
   df = df.Define('probe_ph_idmva','photon_idmva[probe_ph_idx]')

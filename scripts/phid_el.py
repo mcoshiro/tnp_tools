@@ -24,7 +24,7 @@ if __name__=='__main__':
                     file_path+'Run2016F_L1matched.root']
   mc_filenames = [file_path+'DY_NLO_L1matched.root']
   mcalt_filenames = [file_path+'DY_LO_L1matched.root']
-  measurement_cut = ('passingMVA94XV2wp80')
+  measurement_cut = 'passingMVA94XV2wp80'
   measurement_desc = 'Photon ID WP80'
   preselection = 'tag_Ele_pt>40&&tag_Ele_abseta<2.17&&((ph_sc_abseta<1.4442)||(ph_sc_abseta>.1566&&ph_sc_abseta<2.5))'
   preselection_mc = 'tag_Ele_pt>40&&tag_Ele_abseta<2.17&&((ph_sc_abseta<1.4442)||(ph_sc_abseta>.1566&&ph_sc_abseta<2.5))&&mcTrue==1'
@@ -58,11 +58,13 @@ if __name__=='__main__':
     data_filenames = [file_path+'data/merged_Run2022_BCD_ReReco_updated.root']
     mc_filenames = [file_path+'sim/DY_NLO/merged_Run3Summer22MiniAODv4-130X_mcRun3_2022_realistic_v5-v2.root']
     mcalt_filenames = [file_path+'sim/DY_LO/merged_DYJetsToLL_M_50_Run3Summer22MiniAODv4-forPOG_130X_mcRun3_2022_realistic_v5-v2.root']
+    measurement_cut = 'passingMVA122XV1wp80'
   elif (year == '2022EE'):
     file_path = '/eos/cms/store/group/phys_egamma/ec/nkasarag/EGM_comm/TnP_samples/2022/'
     data_filenames = [file_path+'data/merged_Run2022_EReReco_FG_PromptReco_updated.root']
     mc_filenames = [file_path+'sim/DY_NLO/merged_Run3Summer22EEMiniAODv4-130X_mcRun3_2022_realistic_postEE_v6-v2.root']
     mcalt_filenames = [file_path+'sim/DY_LO/merged_DYJetsToLL_M_50_Run3Summer22EEMiniAODv4-forPOG_130X_mcRun3_2022_realistic_postEE_v6-v2.root']
+    measurement_cut = 'passingMVA122XV1wp80'
   #elif (year == '2023BPix'):
   #  preselection += '&&!(el_eta>-1.5&&el_eta<0.0&&el_phi>-1.2&&el_phi<-0.8)'
   #elif (year == '2023BPixHole'):

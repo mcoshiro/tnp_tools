@@ -24,15 +24,16 @@ if __name__=='__main__':
   measurement_desc = 'Fall17v2 Photon ID WP80'
   preselection = 'll_mass<75'
   year = args.year
-  if year=='2018':
-    data_filenames = ['/data2/oshiro/ntuples/2018/phwp80skim_data.root']
-    mc_filenames = ['/data2/oshiro/ntuples/2018/phwp80skim_dyg.root']
-    mcalt_filenames = ['/data2/oshiro/ntuples/2018/phwp80skim_dyg2.root']
-  #pt_binning = [15.0,20.0]
-  pt_binning = [15.0,20.0,35.0,50.0,80.0] #just for validation with EGM SFs
+  data_filenames = ['/data2/oshiro/ntuples/{}/phwp80skim_data.root'.format(year)]
+  mc_filenames = ['/data2/oshiro/ntuples/{}/phwp80skim_dyg.root'.format(year)]
+  mcalt_filenames = ['/data2/oshiro/ntuples/{}/phwp80skim_dyg2.root'.format(year)]
+  if year in ['2022','2022EE']:
+    mcalt_filenames = mc_filenames
+  pt_binning = [15.0,20.0]
+  #pt_binning = [15.0,20.0,35.0,50.0,80.0] #just for validation with EGM SFs
   eta_binning = [-2.5,-2.0,-1.5,-0.8,0.0,0.8,1.5,2.0,2.5]
 
-  analyzer_name = 'hzg_phid_'+year
+  #analyzer_name = 'hzg_phid_'+year
   analyzer_name = 'hzg_phidvalidate_'+year #just for validation with EGM SFs
   
   phid_analyzer = RmsSFAnalyzer(analyzer_name)
