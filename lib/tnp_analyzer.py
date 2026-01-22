@@ -78,6 +78,7 @@ class TnpAnalyzer:
     self.flag_set_binning = False
     self.custom_fit_range = None
     self.template_range = None
+    self.is_mc = False
 
   def set_input_files(self, filenames: list[str], tree_name: str):
     '''Sets input file
@@ -280,16 +281,15 @@ class TnpAnalyzer:
       workspace: T&P workspace
       canvas: canvas to draw plot on
     '''
+    pdf_sb = workspace.pdf('pdf_sb')
     fit_range_lower, fit_range_upper = self.get_fit_range()
     plot = workspace.var('fit_var').frame(fit_range_lower, fit_range_upper)
     workspace.data('data').plotOn(plot)
-    pdf_sb = workspace.pdf('pdf_sb')
-    pdf_sb.plotOn(plot,ROOT.RooFit.Name('fit_sb'))
-    sig_norm_temp = workspace.var('nSig').getValV()
-    bak_norm_temp = workspace.var('nBkg').getValV()
-    workspace.var('nSig').setVal(0.0)
-    pdf_sb.plotOn(plot,ROOT.RooFit.Normalization(bak_norm_temp/(sig_norm_temp+bak_norm_temp),ROOT.RooAbsReal.Relative),ROOT.RooFit.Name('fit_b'))
-    workspace.var('nSig').setVal(sig_norm_temp)
+    pdf_sb.plotOn(plot,ROOT.RooFit.Name('fit_sb'),
+                  ROOT.RooFit.NormRange('fitMassRange'))
+    pdf_sb.plotOn(plot,ROOT.RooFit.Name('fit_b'),
+                  ROOT.RooFit.Components('pdf_b'),
+                  ROOT.RooFit.NormRange('fitMassRange'))
     canvas.cd()
     plot.Draw()
     canvas.Update()
@@ -477,6 +477,63 @@ class TnpAnalyzer:
     fit_session.interactive_fit(['f'])
     return fit_session.run_interactive()
 
+  def get_yields(self) -> list[list[float]]:
+    '''Returns yields and associated uncertainties
+
+    Returns:
+      list of passing signal yields, associated uncertainties, failing signal
+      yields, and their associated uncertainties each of which is a list
+      indexed by bins
+    '''
+    nsig_pass = []
+    nsig_fail = []
+    nsig_pass_unc = []
+    nsig_fail_unc = []
+    for ibin in range(0,self.nbins):
+      pass_param_filename = 'out/{}/fitinfo_bin{}_pass.json'.format(
+          self.temp_name,ibin)
+      fail_param_filename = 'out/{}/fitinfo_bin{}_fail.json'.format(
+          self.temp_name,ibin)
+      pass_param_dict = None
+      fail_param_dict = None
+      with open(pass_param_filename,'r') as input_file:
+        pass_param_dict = json.loads(input_file.read())
+      with open(fail_param_filename,'r') as input_file:
+        fail_param_dict = json.loads(input_file.read())
+      nsig_pass.append(pass_param_dict['nSig'])
+      nsig_fail.append(fail_param_dict['nSig'])
+      nsig_pass_unc.append(pass_param_dict['nSig_unc'])
+      nsig_fail_unc.append(fail_param_dict['nSig_unc'])
+    return [nsig_pass, nsig_pass_unc, nsig_fail, nsig_fail_unc]
+
+  def get_yields_cnc(self) -> list[list[float]]:
+    '''Returns raw yields and associated uncertainties (i.e. assuming 100% 
+    signal)
+
+    Returns:
+      list of passing signal yields, associated uncertainties, failing signal
+      yields, and their associated uncertainties each of which is a list
+      indexed by bins
+    '''
+    self.initialize_files_directories()
+    nsig_pass = []
+    nsig_fail = []
+    nsig_pass_unc = []
+    nsig_fail_unc = []
+    for ibin in range(0,self.nbins):
+      eff = 0.0
+      unc = 1.0
+      npass, npass_unc = get_hist_integral_and_error(
+           self.temp_file.Get('hist_pass_bin{}'.format(ibin)))
+      nfail, nfail_unc = get_hist_integral_and_error(
+           self.temp_file.Get('hist_fail_bin{}'.format(ibin)))
+      nsig_pass.append(npass)
+      nsig_pass_unc.append(npass_unc)
+      nsig_fail.append(nfail)
+      nsig_fail_unc.append(nfail_unc)
+    return [nsig_pass, nsig_pass_unc, nsig_fail, nsig_fail_unc]
+
+
   def draw_fit_set(self, ibin: int, filename: str, 
                    canvas_size: int=320) -> tuple[float,float]:
     '''Draws fits and write fit parameters
@@ -551,16 +608,25 @@ class TnpAnalyzer:
         pass_workspace.var(param_name).setVal(pass_param_dict[param_name])
     pass_plot = pass_workspace.var('fit_var').frame(ROOT.RooFit.Range(
         fit_range_lower,fit_range_upper),ROOT.RooFit.Title('Passing leg'))
+    pass_dummy_plot = pass_workspace.var('fit_var').frame(ROOT.RooFit.Range(
+        fit_range_lower,fit_range_upper))
     pass_workspace.data('data').plotOn(pass_plot, ROOT.RooFit.MarkerStyle(1))
-    sig_norm_temp = pass_workspace.var('nSig').getValV()
-    bak_norm_temp = pass_workspace.var('nBkg').getValV()
-    pass_workspace.var('nSig').setVal(0.0)
+    #There is some inscrutable bug with RooFit that causes only the background
+    #part of the PDF to be drawn if I don't draw the signal PDF. I assume it 
+    #is some quirk of ROOT's memory management, but couldn't figure out exactly
+    #what
+    if not self.is_mc:
+      pass_workspace.pdf('pdf_s').plotOn(pass_dummy_plot,
+                                         ROOT.RooFit.Name('fit_s'),
+                                         ROOT.RooFit.NormRange('fitMassRange'),
+                                         ROOT.RooFit.LineWidth(1),
+                                         ROOT.RooFit.LineColor(ROOT.kGreen))
     pass_workspace.pdf('pdf_sb').plotOn(pass_plot,
-        ROOT.RooFit.Normalization(bak_norm_temp/(sig_norm_temp+bak_norm_temp),
-        ROOT.RooAbsReal.Relative),ROOT.RooFit.Name('fit_b'),
-        ROOT.RooFit.NormRange('fitMassRange'),
-        ROOT.RooFit.LineWidth(1),ROOT.RooFit.LineColor(ROOT.kBlue))
-    pass_workspace.var('nSig').setVal(sig_norm_temp)
+                                        ROOT.RooFit.Name('fit_b'),
+                                        ROOT.RooFit.NormRange('fitMassRange'),
+                                        ROOT.RooFit.LineWidth(1),
+                                        ROOT.RooFit.Components('pdf_b'),
+                                        ROOT.RooFit.LineColor(ROOT.kBlue))
     pass_workspace.pdf('pdf_sb').plotOn(pass_plot,ROOT.RooFit.Name('fit_sb'),
                                         ROOT.RooFit.LineWidth(1),
                                         ROOT.RooFit.NormRange('fitMassRange'),
@@ -588,16 +654,21 @@ class TnpAnalyzer:
         fail_workspace.var(param_name).setVal(fail_param_dict[param_name])
     fail_plot = fail_workspace.var('fit_var').frame(ROOT.RooFit.Range(
         fit_range_lower,fit_range_upper),ROOT.RooFit.Title('Failing leg'))
+    fail_dummy_plot = fail_workspace.var('fit_var').frame(ROOT.RooFit.Range(
+        fit_range_lower,fit_range_upper))
     fail_workspace.data('data').plotOn(fail_plot,ROOT.RooFit.MarkerStyle(1))
-    sig_norm_temp = fail_workspace.var('nSig').getValV()
-    bak_norm_temp = fail_workspace.var('nBkg').getValV()
-    fail_workspace.var('nSig').setVal(0.0)
+    if not self.is_mc:
+      fail_workspace.pdf('pdf_s').plotOn(fail_dummy_plot,
+                                         ROOT.RooFit.Name('fit_s'),
+                                         ROOT.RooFit.NormRange('fitMassRange'),
+                                         ROOT.RooFit.LineWidth(1),
+                                         ROOT.RooFit.LineColor(ROOT.kGreen))
     fail_workspace.pdf('pdf_sb').plotOn(fail_plot,
-        ROOT.RooFit.Normalization(bak_norm_temp/(sig_norm_temp+bak_norm_temp),
-        ROOT.RooAbsReal.Relative),ROOT.RooFit.Name('fit_b'),
-        ROOT.RooFit.NormRange('fitMassRange'),
-        ROOT.RooFit.LineWidth(1),ROOT.RooFit.LineColor(ROOT.kBlue))
-    fail_workspace.var('nSig').setVal(sig_norm_temp)
+                                        ROOT.RooFit.Name('fit_b'),
+                                        ROOT.RooFit.NormRange('fitMassRange'),
+                                        ROOT.RooFit.LineWidth(1),
+                                        ROOT.RooFit.Components('pdf_b'),
+                                        ROOT.RooFit.LineColor(ROOT.kBlue))
     fail_workspace.pdf('pdf_sb').plotOn(fail_plot,ROOT.RooFit.Name('fit_sb'),
                                         ROOT.RooFit.LineWidth(1),
                                         ROOT.RooFit.NormRange('fitMassRange'),

@@ -24,9 +24,11 @@ if __name__=='__main__':
   measurement_desc = 'Fall17v2 Photon ID WP80'
   preselection = 'll_mass<75'
   year = args.year
-  data_filenames = ['/data2/oshiro/ntuples/{}/phwp80skim_data.root'.format(year)]
+  data_filenames = ['/data2/oshiro/ntuples/{}/phwp80skim_data.root'
+                    .format(year)]
   mc_filenames = ['/data2/oshiro/ntuples/{}/phwp80skim_dyg.root'.format(year)]
-  mcalt_filenames = ['/data2/oshiro/ntuples/{}/phwp80skim_dyg2.root'.format(year)]
+  mcalt_filenames = ['/data2/oshiro/ntuples/{}/phwp80skim_dyg2.root'
+                     .format(year)]
   if year in ['2022','2022EE']:
     mcalt_filenames = mc_filenames
   pt_binning = [15.0,20.0]

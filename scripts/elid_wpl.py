@@ -5,6 +5,22 @@
 from rms_sf_analyzer import RmsSFAnalyzer
 from argparse import ArgumentParser
 
+def modify_tag_lowpt(analyzer: RmsSFAnalyzer):
+  '''Increases tag pt for low probe pt bins
+
+  Args:
+    analyzer: analyzer to modify
+  '''
+  lowpt_tag_selections = ('tag_Ele_pt>50&&tag_Ele_3charge==1'
+      +'&&tag_Ele_trigMVA>0.92&&sqrt(2.0*event_met_pfmet*tag_Ele_pt*'
+      +'(1.0-cos(event_met_pfphi-tag_Ele_phi)))<45.0')
+  eta_bins = [-2.5,-2.0,-1.5,-0.8,0.0,0.8,1.5,2.0,2.5]
+  for ibin in range(len(eta_bins)-1):
+    eta_lo = eta_bins[ibin]
+    eta_hi = eta_bins[ibin+1]
+    analyzer.modify_binning(ibin, f'7.0<el_pt&&el_pt<15.0'
+        +f'&&{eta_lo}<el_sc_eta&&el_sc_eta<{eta_hi}&&{lowpt_tag_selections}')
+
 if __name__=='__main__':
 
   argument_parser = ArgumentParser(prog='elid',
@@ -117,11 +133,13 @@ if __name__=='__main__':
   elid_analyzer.set_measurement_variable(measurement_cut,measurement_desc)
   elid_analyzer.set_preselection(preselection,preselection_mc,preselection)
   if (year != '2023BPixHole'):
-    elid_analyzer.add_standard_gap_binning([7.0,15.0,20.0,35.0,50.0,100.0,500.0],
+    elid_analyzer.add_standard_gap_highpt_binning([7.0,15.0,20.0,35.0,50.0,100.0],
         [-2.5,-2.0,-1.5,-0.8,0.0,0.8,1.5,2.0,2.5],[7.0,35.0,500.0],'el_pt',
         'el_sc_eta')
+    modify_tag_lowpt(elid_analyzer)
   else:
     elid_analyzer.add_standard_binning([7.0,20.0,35.0,50.0,500.0],
         [-1.566,-1.4442,-0.8,0.0],'el_pt','el_sc_eta')
-  elid_analyzer.run_interactive()
+  elid_analyzer.print_binning()
+  #elid_analyzer.run_interactive()
 

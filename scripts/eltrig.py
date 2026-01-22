@@ -34,6 +34,9 @@ if __name__=='__main__':
   mc_weight = 'totWeight'
   year = args.year
   pt_binning = [7.0,25.0,26.0,27.0,28.0,29.0,31.0,35.0,50.0,100.0,500.0]
+  pt_rebinning = [7.0,29.0,31.0,35.0,50.0,100.0,500.0]
+  pt_rebinning_map = [0,0,0,0,0,1,2,3,4,5]
+  eta_rebinning_map = [0,1,2,3,4,5,6,7]
   eta_binning = [-2.5,-2.0,-1.5,-0.8,0.0,0.8,1.5,2.0,2.5]
   gappt_binning = [7.0,25.0,35.0,500.0]
   if args.trig=='diel23':
@@ -41,6 +44,8 @@ if __name__=='__main__':
     measurement_desc = 'Dielectron trigger, 23 GeV leg'
     analyzer_name = 'eltrig23'
     pt_binning = [7.0,21.0,22.0,23.0,24.0,25.0,27.0,35.0,50.0,100.0,500.0]
+    pt_rebinning = [7.0,25.0,27.0,35.0,50.0,100.0,500.0]
+    pt_rebinning_map = [0,0,0,0,0,1,2,3,4,5]
     eta_binning = [-2.5,-2.0,-1.5,-0.8,0.0,0.8,1.5,2.0,2.5]
     gappt_binning = [7.0,23.0,35.0,500.0]
   if args.trig=='diel12':
@@ -48,6 +53,8 @@ if __name__=='__main__':
     measurement_desc = 'Dielectron trigger, 12 GeV leg'
     analyzer_name = 'eltrig12'
     pt_binning = [7.0,11.0,12.0,13.0,14.0,16.0,20.0,30.0,50.0,100.0,500.0]
+    pt_rebinning = [7.0,13.0,16.0,20.0,30.0,50.0,100.0,500.0]
+    pt_rebinning_map = [0,0,0,1,1,2,3,4,5,6]
     eta_binning = [-2.5,-2.0,-1.5,-0.8,0.0,0.8,1.5,2.0,2.5]
     gappt_binning = [7.0,12.0,35.0,500.0]
   if (year == '2016'):
@@ -71,6 +78,8 @@ if __name__=='__main__':
       measurement_desc = 'HLT_Ele32_WPTight (emulated)'
       analyzer_name = 'eltrig32'
       pt_binning = [7.0,31.0,32.0,33.0,34.0,35.0,38.0,45.0,80.0,120.0,500.0]
+      pt_rebinning = [7.0,33.0,35.0,38.0,45.0,80.0,120.0,500.0]
+      pt_rebinning_map = [0,0,0,1,1,2,3,4,5,6]
       eta_binning = [-2.5,-2.0,-1.5,-0.8,0.0,0.8,1.5,2.0,2.5]
       gappt_binning = [7.0,32.0,45.0,500.0]
   elif (year == '2018'):
@@ -86,6 +95,8 @@ if __name__=='__main__':
       measurement_desc = 'HLT_Ele32_WPTight'
       analyzer_name = 'eltrig32'
       pt_binning = [7.0,31.0,32.0,33.0,34.0,35.0,38.0,45.0,80.0,120.0,500.0]
+      pt_rebinning = [7.0,33.0,35.0,38.0,45.0,80.0,120.0,500.0]
+      pt_rebinning_map = [0,0,0,1,1,2,3,4,5,6]
       eta_binning = [-2.5,-2.0,-1.5,-0.8,0.0,0.8,1.5,2.0,2.5]
       gappt_binning = [7.0,32.0,45.0,500.0]
   elif (year == '2022'):
@@ -102,6 +113,8 @@ if __name__=='__main__':
       measurement_desc = 'HLT_Ele30_WPTight'
       analyzer_name = 'eltrig30'
       pt_binning = [7.0,31.0,32.0,33.0,34.0,35.0,38.0,45.0,80.0,120.0,500.0]
+      pt_rebinning = [7.0,33.0,35.0,38.0,45.0,80.0,120.0,500.0]
+      pt_rebinning_map = [0,0,0,1,1,2,3,4,5,6]
       eta_binning = [-2.5,-2.0,-1.5,-0.8,0.0,0.8,1.5,2.0,2.5]
       gappt_binning = [7.0,30.0,45.0,500.0]
   elif (year == '2022EE'):
@@ -118,6 +131,8 @@ if __name__=='__main__':
       measurement_desc = 'HLT_Ele30_WPTight'
       analyzer_name = 'eltrig30'
       pt_binning = [7.0,31.0,32.0,33.0,34.0,35.0,38.0,45.0,80.0,120.0,500.0]
+      pt_rebinning = [7.0,33.0,35.0,38.0,45.0,80.0,120.0,500.0]
+      pt_rebinning_map = [0,0,0,1,1,2,3,4,5,6]
       eta_binning = [-2.5,-2.0,-1.5,-0.8,0.0,0.8,1.5,2.0,2.5]
       gappt_binning = [7.0,30.0,45.0,500.0]
   elif (year == '2023'):
@@ -134,6 +149,8 @@ if __name__=='__main__':
       measurement_desc = 'HLT_Ele30_WPTight'
       analyzer_name = 'eltrig30'
       pt_binning = [7.0,31.0,32.0,33.0,34.0,35.0,38.0,45.0,80.0,120.0,500.0]
+      pt_rebinning = [7.0,33.0,35.0,38.0,45.0,80.0,120.0,500.0]
+      pt_rebinning_map = [0,0,0,1,1,2,3,4,5,6]
       eta_binning = [-2.5,-2.0,-1.5,-0.8,0.0,0.8,1.5,2.0,2.5]
       gappt_binning = [7.0,30.0,45.0,500.0]
 
@@ -152,6 +169,8 @@ if __name__=='__main__':
       measurement_desc = 'HLT_Ele30_WPTight'
       analyzer_name = 'eltrig30'
       pt_binning = [7.0,31.0,32.0,33.0,34.0,35.0,38.0,45.0,80.0,120.0,500.0]
+      pt_rebinning = [7.0,33.0,35.0,38.0,45.0,80.0,120.0,500.0]
+      pt_rebinning_map = [0,0,0,1,1,2,3,4,5,6]
       eta_binning = [-2.5,-2.0,-1.5,-0.8,0.0,0.8,1.5,2.0,2.5]
       gappt_binning = [7.0,30.0,45.0,500.0]
   elif (year == '2023BPixHole'):
@@ -190,6 +209,9 @@ if __name__=='__main__':
   else:
     eltrig_analyzer.add_standard_binning(pt_binning,[-1.566,-1.4442,-0.8,0.0],
                                          'el_pt','el_sc_eta')
-  eltrig_analyzer.run_interactive()
+  #eltrig_analyzer.run_interactive()
+  #request from EGM to sacrifice fidelity for smaller stat uncertainties
+  eltrig_analyzer.generate_rebinned_output(pt_rebinning, eta_binning, 
+      pt_rebinning_map, eta_rebinning_map)
 
 

@@ -268,4 +268,17 @@ def bin_wilson_ci(n_pass: float, n_fail: float) -> tuple[float,float]:
   upper = (-1.0*b+sqrt(b**2-4.0*a*c))/2.0/a
   return (lower, upper)
 
+def remove_negative_bins(hist: ROOT.TH1D) -> ROOT.TH1D:
+  """Returns copy of histogram with negative bins zeroed
 
+  Args:
+    hist: histogram to processo
+
+  Returns:
+    copy of hist with negative bins zeroed
+  """
+  clone_hist = hist.Clone(hist.GetName()+'_nonegative')
+  for ibin in range(0,clone_hist.GetNbinsX()+2):
+    if clone_hist.GetBinContent(ibin) < 0.0:
+      clone_hist.SetBinContent(ibin, 0.0)
+  return clone_hist

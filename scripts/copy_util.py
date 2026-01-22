@@ -28,6 +28,16 @@ singlemu_names = {'2016APV': 'mutrig24',
                   '2023': 'mutrig24',
                   '2023BPix': 'mutrig24'}
 
+pico_years = {'2016APV': '2016preVFP_UL',
+              '2016': '2016postVFP_UL',
+              '2017': '2017_UL',
+              '2018': '2018_UL',
+              '2022': '2022',
+              '2022EE': '2022EE',
+              '2023': '2023',
+              '2023BPix': '2023BPix',
+              '2023BPixHole': '2023BPix'}
+
 def fix_measurement_name(name,year):
   if name==measurements[1]:
     return singleel_names[year]
@@ -119,8 +129,102 @@ def copy_an_plots():
              +'../AN-22-027/figs/App-Corrections/').format(meas_name,year))
       subprocess.run(cmd.split())
 
+def copy_to_n2p():
+  years = years_run2 + years_run3
+  for year in years:
+    for measurement in measurements:
+      meas_name = measurement
+      if meas_name=='muid':
+        if not year in ['2023','2023BPix']:
+          continue
+      elif meas_name=='eltrig27':
+        meas_name = singleel_names[year]
+      elif meas_name=='mutrig24':
+        meas_name = singlemu_names[year]
+      corr_type = 'efficiencies'
+      if meas_name in ['elid','muid']:
+        corr_type = 'scalefactors'
+      cmd = (('cp out/hzg_{0}_{1}/hzg_{0}_{1}_{2}.json '
+             +'../nano2pico/data/zgamma/{3}/')
+             .format(meas_name,year,corr_type,pico_years[year]))
+      subprocess.run(cmd.split())
+  #BPixHole
+  year = '2023BPixHole'
+  for measurement in measurements:
+    if not 'el' in measurement:
+      continue
+    meas_name = measurement
+    if meas_name=='eltrig27':
+      meas_name = singleel_names[year]
+    corr_type = 'efficiencies'
+    if meas_name in ['elid','muid']:
+      corr_type = 'scalefactors'
+    cmd = (('cp out/hzg_{0}_{1}/hzg_{0}_{1}_{2}.json '
+           +'../nano2pico/data/zgamma/{3}/')
+           .format(meas_name,year,corr_type,pico_years[year]))
+    subprocess.run(cmd.split())
+
+def make_rebin_page():
+  years = years_run2 + years_run3
+  index_page_text = '<!DOCTYPE html>\n'
+  index_page_text += '<html>\n'
+  index_page_text += '<head>\n'
+  index_page_text += '<link rel="stylesheet" href="../style.css">\n'
+  index_page_text += '</head>\n'
+  index_page_text += '<body>\n'
+  index_page_text += '<h1>Rebinned electron trigger efficiency and scale '
+  index_page_text += 'factor summary plots</h1>\n'
+  index_page_text += '<p>This page was auto-generated.</p>\n'
+  index_page_text += '<p><a href="../index.html">Back to top</a></p>\n'
+  for year in years:
+    for meas_name in ['eltrig27','eltrig23','eltrig12']:
+      if meas_name=='eltrig27':
+        meas_name = singleel_names[year]
+      meas_desc = 'Electron trigger '+meas_name[-2:]
+      index_page_text += f'<h1>{year} {meas_desc}</h1>'
+      for plot_type, desc in [
+          ('eff_data','Data efficiency as a function of pT and eta.'),
+          ('eff_mc','MC efficiency as a function of pT and eta.'),
+          ('eff_ptbinned','Data (solid) and MC (dashed) efficiency as a '
+                          'function of pT for eta bins (colors).'),
+          ('eff_etabinned','Data (solid) and MC (dashed) efficiency as a '
+                           'function of eta for pT bins (colors).'),
+          ('sfpass','Data/MC efficiency ratio (scale factor) as a function '
+                    'of pT and eta.'),
+          ('sfpass_unc','Data/MC efficiency ratio (scale factor) uncertainty'
+                        'as a function of pT and eta.'),
+          ('sfpass_ptbinned','Data/MC efficiency ratio (scale factor) as a '
+                             'function of pT for different eta bins '
+                             '(colors).'),
+          ('sfpass_etabinned','Data/MC efficiency ratio (scale factor) as a '
+                              'function of eta for different pT bins '
+                              '(colors).'),
+          ('sffail','(1-data efficiency)/(1-MC efficiency) as a function '
+                    'of pT and eta.'),
+          ('sffail_unc','(1-data efficiency)/(1-MC efficiency) uncertainty'
+                        'as a function of pT and eta.'),
+          ('sffail_ptbinned','(1-data efficiency)/(1-MC efficiency) as a '
+                             'function of pT for different eta bins '
+                             '(colors).'),
+          ('sffail_etabinned','(1-data efficiency)/(1-MC efficiency) as a '
+                              'function of eta for different pT bins '
+                              '(colors).')]:
+        plot_name = f'hzg_{meas_name}_{year}_{plot_type}.png'
+        cmd = (f'cp out/hzg_{meas_name}_{year}_rebinned/{plot_name} '
+               +'rebinned_page/')
+        subprocess.run(cmd.split())
+        index_page_text += f'<figure><img src="{plot_name}" width="256"'
+        index_page_text += f' height="256"><figcaption>(Above) {desc}'
+        index_page_text += '</figcaption></figure>\n'
+  index_page_text += '</body>\n'
+  index_page_text += '</html>'
+  with open('rebinned_page/index.html','w') as html_file:
+    html_file.write(index_page_text)
+
 if __name__=='__main__':
   #make_summary_plots()
   #make_web_tarballs()
   #make_corr_directory()
-  copy_an_plots()
+  #copy_an_plots()
+  #copy_to_n2p()
+  make_rebin_page()

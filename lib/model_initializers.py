@@ -5,6 +5,7 @@ Package containing model initializers that set up fitting models
 
 import ROOT
 import json
+from tnp_utils import remove_negative_bins
 
 MAX_SIGNAL = 100000000.0
 MAX_BACKGROUND = 100000000.0
@@ -139,6 +140,7 @@ def model_initializer_dscbgaus(fit_var, ibin, is_pass):
   gauss_mu.setVal(75.0)
   gauss_sigma.setVal(5.0)
   gauss_frac.setVal(0.0)
+  gauss_frac.setConstant(True)
 
   nSig = ROOT.RooRealVar('nSig', 'Signal normalization', 0.0, MAX_SIGNAL) 
   nBkg = ROOT.RooRealVar('nBkg', 'Background normalization', 0.0, 0.0) 
@@ -396,8 +398,8 @@ def add_signal_model_mcsumsmear(workspace, ibin, is_pass, get_histogram):
   getattr(workspace,'import')(sigma)
   getattr(workspace,'import')(pass_frac)
 
-  pass_hist = get_histogram(ibin, True)
-  fail_hist = get_histogram(ibin, False)
+  pass_hist = remove_negative_bins(get_histogram(ibin, True))
+  fail_hist = remove_negative_bins(get_histogram(ibin, False))
   core_hist_pass = ROOT.RooDataHist('core_hist_pass',
                                     'core_hist_pass',
                                     ROOT.RooArgList(fit_var), pass_hist)
