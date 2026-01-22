@@ -5,21 +5,38 @@
 from rms_sf_analyzer import RmsSFAnalyzer
 from argparse import ArgumentParser
 
-def modify_tag_lowpt(analyzer: RmsSFAnalyzer):
-  '''Increases tag pt for low probe pt bins
+def modify_tag_lowpt(analyzer: RmsSFAnalyzer, pt_bins: list[float], 
+                     eta_bins: list[float], gap_pt_bins: list[float]):
+  '''Increases tag pt for low probe pt and gap bins
 
   Args:
     analyzer: analyzer to modify
+    eta_bins: eta binning
+    pt_bins: pt binning
+    gap_pt_bins: gap pt binning
   '''
-  lowpt_tag_selections = ('tag_Ele_pt>50&&tag_Ele_3charge==1'
+  lowpt_tag_selections = ('tag_Ele_pt>60&&tag_Ele_3charge==1'
+      +'&&tag_Ele_trigMVA>0.92&&sqrt(2.0*event_met_pfmet*tag_Ele_pt*'
+      +'(1.0-cos(event_met_pfphi-tag_Ele_phi)))<25.0')
+  gap_tag_selections = ('tag_Ele_pt>50&&tag_Ele_3charge==1'
       +'&&tag_Ele_trigMVA>0.92&&sqrt(2.0*event_met_pfmet*tag_Ele_pt*'
       +'(1.0-cos(event_met_pfphi-tag_Ele_phi)))<45.0')
-  eta_bins = [-2.5,-2.0,-1.5,-0.8,0.0,0.8,1.5,2.0,2.5]
-  for ibin in range(len(eta_bins)-1):
+  nbins_eta = len(eta_bins)-1
+  nbins_pt = len(pt_bins)-1
+  nbins_gap_pt = len(gap_pt_bins)-1
+  for ibin in range(nbins_eta):
     eta_lo = eta_bins[ibin]
     eta_hi = eta_bins[ibin+1]
     analyzer.modify_binning(ibin, f'7.0<el_pt&&el_pt<15.0'
         +f'&&{eta_lo}<el_sc_eta&&el_sc_eta<{eta_hi}&&{lowpt_tag_selections}')
+  for ibin in range(nbins_gap_pt):
+    tnp_bin = nbins_eta*nbins_pt+ibin*2
+    pt_lo = gap_pt_bins[ibin]
+    pt_hi = gap_pt_bins[ibin+1]
+    analyzer.modify_binning(tnp_bin, f'{pt_lo}<el_pt&&el_pt<{pt_hi}'
+        +f'&&-1.566<el_sc_eta&&el_sc_eta<-1.4442&&{gap_tag_selections}')
+    analyzer.modify_binning(tnp_bin+1, f'{pt_lo}<el_pt&&el_pt<{pt_hi}'
+        +f'&&1.4442<el_sc_eta&&el_sc_eta<1.566&&{gap_tag_selections}')
 
 if __name__=='__main__':
 
@@ -136,10 +153,11 @@ if __name__=='__main__':
     elid_analyzer.add_standard_gap_highpt_binning([7.0,15.0,20.0,35.0,50.0,100.0],
         [-2.5,-2.0,-1.5,-0.8,0.0,0.8,1.5,2.0,2.5],[7.0,35.0,500.0],'el_pt',
         'el_sc_eta')
-    modify_tag_lowpt(elid_analyzer)
+    modify_tag_lowpt(elid_analyzer, [7.0,15.0,20.0,35.0,50.0,100.0],
+        [-2.5,-2.0,-1.5,-0.8,0.0,0.8,1.5,2.0,2.5],[7.0,35.0,500.0])
   else:
     elid_analyzer.add_standard_binning([7.0,20.0,35.0,50.0,500.0],
         [-1.566,-1.4442,-0.8,0.0],'el_pt','el_sc_eta')
-  elid_analyzer.print_binning()
-  #elid_analyzer.run_interactive()
+  #elid_analyzer.print_binning()
+  elid_analyzer.run_interactive()
 
