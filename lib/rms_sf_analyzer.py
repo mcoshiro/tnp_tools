@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
 """@package docstring
-T&P meta analyzer that follows standard EGM procedures to generate scale factors. In particular:
+T&P meta analyzer that follows standard EGM procedures to generate scale factors. 
 """
 
 from array import array
 from correctionlib import schemav2 
 from functools import partial
+from collections.abc import Callable
 import gc
 import os
 import ROOT
@@ -14,7 +15,7 @@ import subprocess
 import json
 
 from tnp_analyzer import *
-from tnp_utils import CMS_COLORS, LUMI_TAGS
+from tnp_utils import CMS_COLORS, LUMI_TAGS, make_heatmap
 from model_initializers import *
 from root_plot_lib import RplPlot
 
@@ -425,38 +426,6 @@ def make_sf_graph(x: list[float], ex: list[float], y: list[list[float]],
   sf_plot.log_x = log_x
   sf_plot.draw(name)
 
-def make_heatmap(x: list[float], y: list[float], z: list[float], name: str, 
-                 x_title: str, y_title: str, z_title: str, 
-                 lumi: list[tuple[float,float]], log_x: bool=False, 
-                 log_y: bool=False):
-  '''Makes a heatmap (2D histogram/colz)
-
-  Args:
-    x: x axis bin divisions
-    y: y axis bin divisions
-    z: heatmap values
-    name: filename
-    x_title: x-axis label
-    y_title: y-axis label
-    z_title: z-axis label
-    lumi: list of tuple of two floats representing lumi and CM energy
-    log_x: if true sets x-axis to be logarithmic
-    log_y: if true sets y-axis to be logarithmic
-  '''
-  x_bins = array('d',x)
-  y_bins = array('d',y)
-  hist = ROOT.TH2D('heatmap',';'+x_title+';'+y_title+';'+z_title,
-                   len(x)-1,x_bins,len(y)-1,y_bins)
-  for ix in range(len(x)-1):
-    for iy in range(len(y)-1):
-      hist.SetBinContent(ix+1, iy+1, z[ix][iy])
-  sf_plot = RplPlot()
-  sf_plot.lumi_data = lumi
-  sf_plot.plot_colormap(hist)
-  sf_plot.log_x = log_x
-  sf_plot.log_y = log_y
-  sf_plot.draw(name)
-
 class RmsSFAnalyzer:
   '''Class that manages RMS SF/efficiency derivation
 
@@ -482,6 +451,7 @@ class RmsSFAnalyzer:
     altsb_fn_name: name of alternate signal+background fit function
     alts_fn_init: initializer for alternate signal fit function
     alts_fn_name_sa: name of alternate signal fit function without background
+    generate_json_plot_callback: function to generate output for custom binning
   '''
 
   def __init__(self, name: str):
@@ -515,6 +485,8 @@ class RmsSFAnalyzer:
     self.altsb_fn_name = ''
     self.alts_fn_init = ''
     self.alts_fn_name_sa = ''
+    self.web_template = 'data/index_template.html'
+    self.generate_json_plot_callback = None
 
   def set_input_files(self, data_files: list[str], mc_files: list[str], 
                       mc_alt_files: list[str], data_tree: str, 
@@ -580,7 +552,7 @@ class RmsSFAnalyzer:
 
     Args:
       var: name of branch in TTree or C++ expression
-      desc: description o fmeasurement variable
+      desc: description of measurement variable
     '''
     self.data_nom_tnp_analyzer.set_measurement_variable(var,desc)
     self.data_altsig_tnp_analyzer.set_measurement_variable(var,desc)
@@ -650,13 +622,16 @@ class RmsSFAnalyzer:
       self.highpt_bins.remove(bin_number)
 
   def add_custom_binning(self, bin_selections: list[str], 
-                         bin_names: list[str], is_high_pt: list[bool]):
+                         bin_names: list[str], is_high_pt: list[bool],
+                         web_template: str, output_callback: Callable):
     '''Creates custom bins for TnP analysis
 
     Args:
       bin_selections: describes selection for each bin
       bin_names: names of each bin that appear in plots
       is_high_pt: indicates whether each bin is high pT
+      web_template: location of web template file
+      output_callback: function to generate jsons/plots
     '''
     self.data_nom_tnp_analyzer.add_custom_binning(bin_selections, bin_names)
     self.data_altsig_tnp_analyzer.add_custom_binning(bin_selections, bin_names)
@@ -669,6 +644,8 @@ class RmsSFAnalyzer:
     for ibin in range(len(is_high_pt)):
       if is_high_pt[ibin]:
         self.highpt_bins.append(ibin)
+    self.web_template = web_template
+    self.generate_json_plot_callback = output_callback
 
   def add_standard_binning(self, pt_bins: list[float], eta_bins: list[float], 
                            pt_var_name: str, eta_var_name: str):
@@ -699,6 +676,7 @@ class RmsSFAnalyzer:
     self.pt_bins = pt_bins
     self.eta_bins = eta_bins
     self.gap_pt_bins = []
+    self.generate_json_plot_callback = self.generate_jsons_summary_plots_nogap
 
   def add_standard_gap_binning(self, pt_bins: list[float], 
                                eta_bins: list[float], 
@@ -749,65 +727,8 @@ class RmsSFAnalyzer:
     self.pt_bins = pt_bins
     self.eta_bins = eta_bins
     self.gap_pt_bins = gap_pt_bins
-
-  def add_standard_gap_highpt_binning(self, pt_bins: list[float], 
-                                     eta_bins: list[float], 
-                                     gap_pt_bins: list[float], 
-                                     pt_var_name: str, 
-                                     eta_var_name: str):
-    '''Creates standard binning including specialized pt bins for gap region
-
-    Args:
-      pt_bins: pt bin edges
-      eta_bins: eta bin edges
-      gap_pt_bins: gap region pt bin edges
-      pt_var_name: name of pt variable
-      eta_var_name: name of eta variable
-    '''
-    bin_selections = []
-    bin_names = []
-    is_high_pt = []
-    for ipt in range(len(pt_bins)-1):
-      for ieta in range(len(eta_bins)-1):
-        bin_selections.append('{}<{}&&{}<{}&&{}<{}&&{}<{}'.format(
-            pt_bins[ipt],pt_var_name,pt_var_name,pt_bins[ipt+1],
-            eta_bins[ieta],eta_var_name,eta_var_name,eta_bins[ieta+1]))
-        bin_names.append('{}<p_{{T}}<{} GeV, {}<#eta<{}'.format(
-            pt_bins[ipt],pt_bins[ipt+1],eta_bins[ieta],eta_bins[ieta+1]))
-        if (pt_bins[ipt]>70.0):
-          is_high_pt.append(True)
-        else:
-          is_high_pt.append(False)
-    for ipt in range(len(gap_pt_bins)-1):
-      bin_selections.append('{}<{}&&{}<{}&&-1.566<{}&&{}<-1.4442'.format(
-          gap_pt_bins[ipt],pt_var_name,pt_var_name,gap_pt_bins[ipt+1],
-          eta_var_name,eta_var_name))
-      bin_names.append('{}<p_{{T}}<{} GeV, -1.566<#eta<-1.4442'.format(
-          gap_pt_bins[ipt],gap_pt_bins[ipt+1]))
-      bin_selections.append('{}<{}&&{}<{}&&1.4442<{}&&{}<1.566'.format(
-          gap_pt_bins[ipt],pt_var_name,pt_var_name,gap_pt_bins[ipt+1],
-          eta_var_name,eta_var_name))
-      bin_names.append('{}<p_{{T}}<{} GeV, 1.4442<#eta<1.566'.format(
-          gap_pt_bins[ipt],gap_pt_bins[ipt+1]))
-      if (pt_bins[ipt]>70.0):
-        is_high_pt.append(True)
-        is_high_pt.append(True)
-      else:
-        is_high_pt.append(False)
-        is_high_pt.append(False)
-    bin_selections.append(f'100<{pt_var_name}&&{pt_var_name}<500'
-        +f'&&0.0<fabs({eta_var_name})&&fabs({eta_var_name})<1.5')
-    bin_names.append('100<p_{T}<500, 0<|#eta|<1.5')
-    bin_selections.append(f'100<{pt_var_name}&&{pt_var_name}<500'
-        +f'&&1.5<fabs({eta_var_name})&&fabs({eta_var_name})<2.5')
-    bin_names.append('100<p_{T}<500, 1.5<|#eta|<2.5')
-    is_high_pt.append(True)
-    is_high_pt.append(True)
-    self.binning_type = 'std_gap_highpt'
-    self.add_custom_binning(bin_selections, bin_names, is_high_pt)
-    self.pt_bins = pt_bins
-    self.eta_bins = eta_bins
-    self.gap_pt_bins = gap_pt_bins
+    self.web_template = 'data/index_template_gap.html'
+    self.generate_json_plot_callback = self.generate_jsons_summary_plots_gap
 
   def print_binning(self):
     '''Debug function for binning
@@ -996,46 +917,19 @@ class RmsSFAnalyzer:
   def generate_web_output(self):
     '''Generates webpage that summarizes output
     '''
-    #do checks
-    sf_filename = 'out/{0}/{0}_scalefactors.json'.format(self.name)
-    if not os.path.exists(sf_filename):
-      print('ERROR: general output must be created before web output')
-      return
-    if os.path.isdir('out/web_{0}'.format(self.name)):
-      print('ERROR: web output already exists, aborting')
-      return
 
     #generate plots
-    webdir = 'out/web_{0}'.format(self.name)
-    os.mkdir(webdir)
     self.data_nom_tnp_analyzer.generate_web_output(webdir)
     self.data_altsig_tnp_analyzer.generate_web_output(webdir)
     self.data_altbkg_tnp_analyzer.generate_web_output(webdir)
     self.data_altsigbkg_tnp_analyzer.generate_web_output(webdir)
     self.mc_nom_tnp_analyzer.generate_web_output(webdir)
-    self.generate_output(True)
-    plot_types = ['eff_data','eff_mc','eff_ptbinned','eff_etabinned','sfpass',
-                  'sfpass_unc','sfpass_ptbinned','sfpass_etabinned','sffail',
-                  'sffail_unc','sffail_ptbinned','sffail_etabinned']
-    if self.binning_type=='std_gap' or self.binning_type=='std_gap_highpt':
-      plot_types += ['eff_gapptbinned','sfpass_gapptbinned',
-                     'sffail_gapptbinned']
-    for plot_type in plot_types:
-      subprocess.run(('mv out/{0}/{0}_{1}.png out/web_{0}/'.format(self.name,
-                      plot_type)).split())
 
     nbins = self.data_nom_tnp_analyzer.nbins
 
     #setup web page/directory
-    if self.binning_type=='std_gap':
-      with open('data/index_template_gap.html','r') as template_file:
-        index_content = template_file.read()
-    elif self.binning_type=='std_gap_highpt':
-      with open('data/index_template_gap_highpt.html','r') as template_file:
-        index_content = template_file.read()
-    else:
-      with open('data/index_template.html','r') as template_file:
-        index_content = template_file.read()
+    with open(self.web_template,'r') as template_file:
+      index_content = template_file.read()
     index_content = index_content.replace('{0}',self.name)
     with open('{0}/index.html'.format(webdir),'w') as webindex_file:
       webindex_file.write(index_content)
@@ -1060,17 +954,19 @@ class RmsSFAnalyzer:
             analyzer.temp_name,ibin))
       fits_file.write('</body>\n</html>\n')
 
-  def generate_output(self, is_webversion: bool=False, cnc: bool=False):
+  def generate_output(self, cnc: bool=False):
     '''Generate final SFs and histograms
 
     Args:
-      is_webvserion: flag indicating to make png versions of plots
       cnc: flag to use cut-and-count efficiencies rather than fits
     '''
 
-    if not is_webversion:
-      if not self.generate_individual_outputs(cnc):
-        return
+    #checks
+    if not self.generate_individual_outputs(cnc):
+      return
+    if os.path.isdir('out/web_{0}'.format(self.name)):
+      print('ERROR: web output already exists, aborting')
+      return
 
     #get efficiencies from JSON files
     nomdat_name = self.name+'_data_nom'
@@ -1142,29 +1038,34 @@ class RmsSFAnalyzer:
       fail_sf.append(sfs[2])
       fail_unc.append(sfs[3])
 
-    if self.binning_type=='std':
-      if not is_webversion:
-        self.generate_jsons_nogap(data_eff, data_unc, mc_eff, mc_unc, 
-                                  pass_sf, pass_unc, fail_sf, fail_unc)
-      self.generate_summary_plots_nogap(data_eff, data_unc, mc_eff, mc_unc,
-                                        pass_sf, pass_unc, fail_sf, fail_unc,
-                                        is_webversion)
-    elif self.binning_type=='std_gap':
-      if not is_webversion:
-        self.generate_jsons_gap(data_eff, data_unc, mc_eff, mc_unc, pass_sf, 
-                                pass_unc, fail_sf, fail_unc)
-      self.generate_summary_plots_gap(data_eff, data_unc, mc_eff, mc_unc,
-                                      pass_sf, pass_unc, fail_sf, fail_unc,
-                                      is_webversion)
-    elif self.binning_type=='std_gap_highpt':
-      if not is_webversion:
-        self.generate_jsons_gap_highpt(data_eff, data_unc, mc_eff, mc_unc, 
-                                       pass_sf, pass_unc, fail_sf, fail_unc)
-      self.generate_summary_plots_gap_highpt(data_eff, data_unc, mc_eff, 
-                                             mc_unc, pass_sf, pass_unc, 
-                                             fail_sf, fail_unc, is_webversion)
-    else:
-      raise RuntimeError('Unsupported binning')
+    webdir = 'out/web_{0}'.format(self.name)
+    os.mkdir(webdir)
+    desc = self.data_nom_tnp_analyzer.measurement_desc
+    self.generate_json_plot_callback(self, data_eff, data_unc, mc_eff, 
+        mc_unc, pass_sf, pass_unc, fail_sf, fail_unc, name, desc, self.year)
+    self.generate_web_output()
+
+  def generate_jsons_summary_plots_nogap(data_eff: list[float], 
+      data_unc: list[float], mc_eff: list[float], mc_unc: list[float], 
+      pass_sf: list[float], pass_unc: list[float], fail_sf: list[float], 
+      fail_unc: list[float], name: str, desc: str, year: str):
+    '''Generates jsons and summary plots for standard binning
+    '''
+    self.generate_jsons_nogap(data_eff, data_unc, mc_eff, mc_unc, 
+                              pass_sf, pass_unc, fail_sf, fail_unc)
+    self.generate_summary_plots_nogap(data_eff, data_unc, mc_eff, mc_unc,
+                                      pass_sf, pass_unc, fail_sf, fail_unc)
+
+  def generate_jsons_summary_plots_gap(data_eff: list[float], 
+      data_unc: list[float], mc_eff: list[float], mc_unc: list[float], 
+      pass_sf: list[float], pass_unc: list[float], fail_sf: list[float], 
+      fail_unc: list[float], name: str, desc: str, year: str):
+    '''Generates jsons and summary plots for standard gap binning
+    '''
+    self.generate_jsons_gap(data_eff, data_unc, mc_eff, mc_unc, 
+                            pass_sf, pass_unc, fail_sf, fail_unc)
+    self.generate_summary_plots_gap(data_eff, data_unc, mc_eff, mc_unc,
+                                    pass_sf, pass_unc, fail_sf, fail_unc)
 
   def generate_rebinned_output(self, new_pt_bins, new_eta_bins, pt_bin_map, 
                                eta_bin_map):
@@ -1421,113 +1322,11 @@ class RmsSFAnalyzer:
          clib_sfs_fail.json(exclude_unset=True),
          clib_uns_fail.json(exclude_unset=True)]))
 
-  def generate_jsons_gap_highpt(self, data_eff: list[float], 
-                         data_unc: list[float], 
-                         mc_eff: list[float], mc_unc: list[float], 
-                         pass_sf: list[float], pass_unc: list[float], 
-                         fail_sf: list[float], fail_unc: list[float]):
-    '''Generate output assuming standard gap binning
-
-    Args:
-      data_eff: list of data efficiencies
-      data_unc: list of data uncertainties
-      mc_eff: list of mc efficiencies
-      mc_unc: list of mc uncertainties
-      pass_sf: list of scale factors (SFs) for passing selection
-      pass_unc: list of uncertainties on passing SFs
-      fail_sf: list of scale factors for failing selection
-      fail_unc: list of uncertainties on failing SFs
-    '''
-    #organize SFs as they will be saved in the JSON
-    gapincl_eta_bins, neg_gap_idx, pos_gap_idx = add_gap_eta_bins(self.eta_bins)
-    pass_json_sfs = []
-    pass_json_uns = []
-    fail_json_sfs = []
-    fail_json_uns = []
-    json_dat_eff = []
-    json_dat_unc = []
-    json_sim_eff = []
-    json_sim_unc = []
-    num_bins_pt = len(self.pt_bins)-1
-    num_bins_eta = len(self.eta_bins)-1
-    num_bins_ptgap = len(self.gap_pt_bins)
-    for ipt in range(num_bins_pt+1):
-      mean_bin_pt = (self.pt_bins[ipt]+self.pt_bins[ipt+1])/2.0
-      for ieta in range(num_bins_eta+2):
-        tnp_bin = -1
-        if ieta < neg_gap_idx:
-          if ipt == num_bins_pt:
-            tnp_bin = num_bins_pt*num_bins_eta+2*num_bins_ptgap
-          else:
-            tnp_bin = ipt*num_bins_eta+ieta
-        elif ieta == neg_gap_idx:
-          tnp_bin = (num_bins_pt*num_bins_eta
-                     +get_bin(mean_bin_pt, self.gap_pt_bins)*2)
-        elif ieta > neg_gap_idx and ieta < pos_gap_idx:
-          if ipt == num_bins_pt:
-            tnp_bin = num_bins_pt*num_bins_eta+2*num_bins_ptgap+1
-          else:
-            tnp_bin = ipt*num_bins_eta+(ieta-1)
-        elif ieta == pos_gap_idx:
-          tnp_bin = (num_bins_pt*num_bins_eta
-                     +get_bin(mean_bin_pt, self.gap_pt_bins)*2+1)
-        elif ieta > pos_gap_idx:
-          if ipt == num_bins_pt:
-            tnp_bin = num_bins_pt*num_bins_eta+2*num_bins_ptgap
-          else:
-            tnp_bin = ipt*num_bins_eta+(ieta-2)
-        pass_json_sfs.append(pass_sf[tnp_bin])
-        pass_json_uns.append(pass_unc[tnp_bin])
-        fail_json_sfs.append(fail_sf[tnp_bin])
-        fail_json_uns.append(fail_unc[tnp_bin])
-        json_dat_eff.append(data_eff[tnp_bin])
-        json_dat_unc.append(data_unc[tnp_bin])
-        json_sim_eff.append(mc_eff[tnp_bin])
-        json_sim_unc.append(mc_unc[tnp_bin])
-
-    if not os.path.isdir('out/'+self.name):
-      print('Output directory not found, making new output directory')
-      os.mkdir('out/'+self.name)
-
-    #write JSON
-    clib_sfs_pass = make_correction('sf_pass', 'data-MC SF', self.pt_bins, 
-                                    gapincl_eta_bins, pass_json_sfs)
-    clib_uns_pass = make_correction('unc_pass', 'data-MC unc', self.pt_bins, 
-                                    gapincl_eta_bins, pass_json_uns)
-    clib_sfs_fail = make_correction('sf_fail', 'data-MC SF', self.pt_bins, 
-                                    gapincl_eta_bins, fail_json_sfs)
-    clib_uns_fail = make_correction('unc_fail', 'data-MC unc', self.pt_bins, 
-                                    gapincl_eta_bins, fail_json_uns)
-    clib_dat_eff = make_correction('effdata', 'data eff', self.pt_bins, 
-                                   gapincl_eta_bins, json_dat_eff)
-    clib_dat_unc = make_correction('systdata', 'data unc', self.pt_bins, 
-                                   gapincl_eta_bins, json_dat_unc)
-    clib_sim_eff = make_correction('effmc', 'MC eff', self.pt_bins, 
-                                   gapincl_eta_bins, json_sim_eff)
-    clib_sim_unc = make_correction('systmc', 'MC unc', self.pt_bins, 
-                                   gapincl_eta_bins, json_sim_unc)
-
-    sf_filename = 'out/{0}/{0}_scalefactors.json'.format(self.name)
-    eff_filename = 'out/{0}/{0}_efficiencies.json'.format(self.name)
-    with open(eff_filename,'w') as output_file:
-      output_file.write(fix_correctionlib_json(
-        [clib_dat_eff.json(exclude_unset=True),
-         clib_dat_unc.json(exclude_unset=True),
-         clib_sim_eff.json(exclude_unset=True),
-         clib_sim_unc.json(exclude_unset=True)]))
-    with open(sf_filename,'w') as output_file:
-      output_file.write(fix_correctionlib_json(
-        [clib_sfs_pass.json(exclude_unset=True),
-         clib_uns_pass.json(exclude_unset=True),
-         clib_sfs_fail.json(exclude_unset=True),
-         clib_uns_fail.json(exclude_unset=True)]))
-
   def generate_summary_plots_nogap(self, data_eff: list[float], 
                                    data_unc: list[float], mc_eff: list[float], 
                                    mc_unc: list[float], pass_sf: list[float], 
                                    pass_unc: list[float], fail_sf: list[float],
                                    fail_unc: list[float], 
-                                   is_webversion: bool=False, 
                                    pt_bins: list[float]=None, 
                                    eta_bins: list[float]=None, 
                                    tag: str=''):
@@ -1556,7 +1355,6 @@ class RmsSFAnalyzer:
       pass_unc: list of uncertainties on passing SFs
       fail_sf: list of scale factors for failing selection
       fail_unc: list of uncertainties on failing SFs
-      is_webversion: flag to indicate if output should be web-friendly
       pt_bins: pt binning
       eta_bins: eta binning
       tag: used to set output directory
@@ -1649,7 +1447,6 @@ class RmsSFAnalyzer:
         sf_pt_plot_fail_ey[ieta].append(fail_unc[tnp_bin])
 
     eff_string = 'Efficiency '+self.data_nom_tnp_analyzer.measurement_desc
-    eff_string = 'Efficiency '+self.data_nom_tnp_analyzer.measurement_desc
     unc_string = 'Eff. Unc. '+self.data_nom_tnp_analyzer.measurement_desc
     passsf_string = 'Pass SF '+self.data_nom_tnp_analyzer.measurement_desc
     failsf_string = 'Fail SF '+self.data_nom_tnp_analyzer.measurement_desc
@@ -1663,91 +1460,88 @@ class RmsSFAnalyzer:
                 self.name,fit_syst,tag))
     gc.collect()
     gc.disable()
-    file_extension = 'pdf'
-    if is_webversion:
-      file_extension = 'png'
-    make_data_mc_graph(eta_plot_x, eta_plot_ex, eff_eta_plot_data_y, 
-                       eff_eta_plot_data_ey, eff_eta_plot_mc_y, 
-                       eff_eta_plot_mc_ey, 
-                       'out/{0}{2}/{0}_eff_etabinned.{1}'.format(self.name, 
-                       file_extension, tag), 
-                       eta_plot_data_names, eta_plot_mc_names,
-                       '|#eta|', eff_string, LUMI_TAGS[self.year])
-    make_data_mc_graph(pt_plot_x, pt_plot_ex, eff_pt_plot_data_y, 
-                       eff_pt_plot_data_ey, eff_pt_plot_mc_y, 
-                       eff_pt_plot_mc_ey, 
-                       'out/{0}{2}/{0}_eff_ptbinned.{1}'.format(self.name, 
-                       file_extension, tag),
-                       pt_plot_data_names, pt_plot_mc_names,
-                       'p_{T} [GeV]', eff_string, LUMI_TAGS[self.year],True)
-    make_heatmap(eta_bins, pt_bins, eff_pt_plot_data_y, 
-                 'out/{0}{2}/{0}_eff_data.{1}'.format(self.name, 
-                 file_extension, tag), 
-                 '|#eta|', 
-                 'p_{T} [GeV]', 
-                 eff_string, LUMI_TAGS[self.year],False,True)
-    make_heatmap(eta_bins, pt_bins, eff_pt_plot_mc_y, 
-                 'out/{0}{2}/{0}_eff_mc.{1}'.format(self.name, 
-                   file_extension, tag), 
-                 '|#eta|', 
-                 'p_{T} [GeV]',
-                 eff_string, LUMI_TAGS[self.year],False,True)
-    make_sf_graph(eta_plot_x, eta_plot_ex, sf_eta_plot_pass_y, 
-                  sf_eta_plot_pass_ey, 
-                  'out/{0}{2}/{0}_sfpass_etabinned.{1}'.format(self.name, 
-                                                               file_extension,
-                                                               tag),
-                  eta_plot_names, '|#eta|', 'Pass SF', LUMI_TAGS[self.year])
-    make_sf_graph(eta_plot_x, eta_plot_ex, sf_eta_plot_fail_y, 
-                  sf_eta_plot_fail_ey, 
-                  'out/{0}{2}/{0}_sffail_etabinned.{1}'.format(self.name, 
-                                                               file_extension,
-                                                               tag),
-                  eta_plot_names, '|#eta|', 'Fail SF', LUMI_TAGS[self.year])
-    make_sf_graph(pt_plot_x, pt_plot_ex, sf_pt_plot_pass_y, sf_pt_plot_pass_ey,
-                  'out/{0}{2}/{0}_sfpass_ptbinned.{1}'.format(self.name, 
-                                                              file_extension,
-                                                              tag),
-                  pt_plot_names, 'p_{T} [GeV]', 'Pass SF', LUMI_TAGS[self.year],
-                  True)
-    make_sf_graph(pt_plot_x, pt_plot_ex, sf_pt_plot_fail_y, sf_pt_plot_fail_ey, 
-                  'out/{0}{2}/{0}_sffail_ptbinned.{1}'.format(self.name, 
-                                                              file_extension, 
-                                                              tag),
-                  pt_plot_names, 'p_{T} [GeV]', 'Fail SF', LUMI_TAGS[self.year],
-                  True)
-    make_heatmap(eta_bins, pt_bins, sf_pt_plot_pass_y, 
-                 'out/{0}{2}/{0}_sfpass.{1}'.format(self.name, file_extension, 
-                                                    tag), 
-                 '|#eta|', 
-                 'p_{T} [GeV]', passsf_string, LUMI_TAGS[self.year], False, 
-                 True)
-    make_heatmap(eta_bins, pt_bins, sf_pt_plot_fail_y, 
-                 'out/{0}{2}/{0}_sffail.{1}'.format(self.name, file_extension, 
-                                                    tag), 
-                 '|#eta|', 
-                 'p_{T} [GeV]', failsf_string, LUMI_TAGS[self.year], False, 
-                 True)
-    make_heatmap(eta_bins, pt_bins, sf_pt_plot_pass_ey, 
-                 'out/{0}{2}/{0}_sfpass_unc.{1}'.format(self.name, 
-                                                        file_extension, tag), 
-                 '|#eta|', 
-                 'p_{T} [GeV]', passunc_string, LUMI_TAGS[self.year], False, 
-                 True)
-    make_heatmap(eta_bins, pt_bins, sf_pt_plot_fail_ey, 
-                 'out/{0}{2}/{0}_sffail_unc.{1}'.format(self.name, 
-                                                        file_extension, tag), 
-                 '|#eta|', 
-                 'p_{T} [GeV]', failunc_string, LUMI_TAGS[self.year], False, 
-                 True)
+    for file_extension, web_tag in [('pdf',''),('png','web_')]:
+      make_data_mc_graph(eta_plot_x, eta_plot_ex, eff_eta_plot_data_y, 
+                         eff_eta_plot_data_ey, eff_eta_plot_mc_y, 
+                         eff_eta_plot_mc_ey, 
+                         'out/{3}{0}{2}/{0}_eff_etabinned.{1}'.format(
+                         self.name, file_extension, tag, web_tag), 
+                         eta_plot_data_names, eta_plot_mc_names,
+                         '|#eta|', eff_string, LUMI_TAGS[self.year])
+      make_data_mc_graph(pt_plot_x, pt_plot_ex, eff_pt_plot_data_y, 
+                         eff_pt_plot_data_ey, eff_pt_plot_mc_y, 
+                         eff_pt_plot_mc_ey, 
+                         'out/{3}{0}{2}/{0}_eff_ptbinned.{1}'.format(self.name, 
+                         file_extension, tag, web_tag),
+                         pt_plot_data_names, pt_plot_mc_names,
+                         'p_{T} [GeV]', eff_string, LUMI_TAGS[self.year],True)
+      make_heatmap(eta_bins, pt_bins, eff_pt_plot_data_y, 
+                   'out/{3}{0}{2}/{0}_eff_data.{1}'.format(self.name, 
+                   file_extension, tag, web_tag), 
+                   '|#eta|', 
+                   'p_{T} [GeV]', 
+                   eff_string, LUMI_TAGS[self.year],False,True)
+      make_heatmap(eta_bins, pt_bins, eff_pt_plot_mc_y, 
+                   'out/{3}{0}{2}/{0}_eff_mc.{1}'.format(self.name, 
+                     file_extension, tag, web_tag), 
+                   '|#eta|', 
+                   'p_{T} [GeV]',
+                   eff_string, LUMI_TAGS[self.year],False,True)
+      make_sf_graph(eta_plot_x, eta_plot_ex, sf_eta_plot_pass_y, 
+                    sf_eta_plot_pass_ey, 
+                    'out/{3}{0}{2}/{0}_sfpass_etabinned.{1}'.format(self.name, 
+                        file_extension, tag, web_tag),
+                    eta_plot_names, '|#eta|', 'Pass SF', LUMI_TAGS[self.year])
+      make_sf_graph(eta_plot_x, eta_plot_ex, sf_eta_plot_fail_y, 
+                    sf_eta_plot_fail_ey, 
+                    'out/{3}{0}{2}/{0}_sffail_etabinned.{1}'.format(self.name, 
+                        file_extension, tag, web_tag),
+                    eta_plot_names, '|#eta|', 'Fail SF', LUMI_TAGS[self.year])
+      make_sf_graph(pt_plot_x, pt_plot_ex, sf_pt_plot_pass_y, 
+                    sf_pt_plot_pass_ey,
+                    'out/{3}{0}{2}/{0}_sfpass_ptbinned.{1}'.format(self.name, 
+                        file_extension, tag, web_tag),
+                    pt_plot_names, 'p_{T} [GeV]', 'Pass SF', 
+                    LUMI_TAGS[self.year],
+                    True)
+      make_sf_graph(pt_plot_x, pt_plot_ex, sf_pt_plot_fail_y, 
+                    sf_pt_plot_fail_ey, 
+                    'out/{3}{0}{2}/{0}_sffail_ptbinned.{1}'.format(self.name, 
+                        file_extension, tag),
+                    pt_plot_names, 'p_{T} [GeV]', 'Fail SF', 
+                    LUMI_TAGS[self.year],
+                    True)
+      make_heatmap(eta_bins, pt_bins, sf_pt_plot_pass_y, 
+                   'out/{3}{0}{2}/{0}_sfpass.{1}'.format(self.name, 
+                       file_extension, tag, web_tag), 
+                   '|#eta|', 
+                   'p_{T} [GeV]', passsf_string, LUMI_TAGS[self.year], False, 
+                   True)
+      make_heatmap(eta_bins, pt_bins, sf_pt_plot_fail_y, 
+                   'out/{3}{0}{2}/{0}_sffail.{1}'.format(self.name, 
+                       file_extension, tag, web_tag), 
+                   '|#eta|', 
+                   'p_{T} [GeV]', failsf_string, LUMI_TAGS[self.year], False, 
+                   True)
+      make_heatmap(eta_bins, pt_bins, sf_pt_plot_pass_ey, 
+                   'out/{3}{0}{2}/{0}_sfpass_unc.{1}'.format(self.name, 
+                       file_extension, tag, web_tag), 
+                   '|#eta|', 
+                   'p_{T} [GeV]', passunc_string, LUMI_TAGS[self.year], False, 
+                   True)
+      make_heatmap(eta_bins, pt_bins, sf_pt_plot_fail_ey, 
+                   'out/{3}{0}{2}/{0}_sffail_unc.{1}'.format(self.name, 
+                       file_extension, tag, web_tag), 
+                   '|#eta|', 
+                   'p_{T} [GeV]', failunc_string, LUMI_TAGS[self.year], False, 
+                   True)
     gc.enable()
 
   def generate_summary_plots_gap(self, data_eff: list[float], 
                                  data_unc: list[float], mc_eff: list[float], 
                                  mc_unc: list[float], pass_sf: list[float], 
                                  pass_unc: list[float], fail_sf: list[float], 
-                                 fail_unc: list[float], 
-                                 is_webversion: bool=False):
+                                 fail_unc: list[float]):
     '''generate following plots: 1D eta efficiency plot with MC & data
                                  1D pt efficiency plot with MC & data
                                  gap 1D pt efficiency plot with MC & data
@@ -1773,7 +1567,6 @@ class RmsSFAnalyzer:
       pass_unc: list of uncertainties on passing SFs
       fail_sf: list of scale factors for failing selection
       fail_unc: list of uncertainties on failing SFs
-      is_webvserion: flag to indicate if output should be web-friendly
     '''
     eta_plot_x = []
     eta_plot_ex = []
@@ -1818,9 +1611,12 @@ class RmsSFAnalyzer:
     for ieta in range(len(self.eta_bins)-1):
       eta_plot_x.append((self.eta_bins[ieta+1]+self.eta_bins[ieta])/2.0)
       eta_plot_ex.append((self.eta_bins[ieta+1]-self.eta_bins[ieta])/2.0)
-      pt_plot_names.append('{}<#eta<{}'.format(self.eta_bins[ieta],self.eta_bins[ieta+1]))
-      pt_plot_data_names.append('Data {}<#eta<{}'.format(self.eta_bins[ieta],self.eta_bins[ieta+1]))
-      pt_plot_mc_names.append('MC {}<#eta<{}'.format(self.eta_bins[ieta],self.eta_bins[ieta+1]))
+      pt_plot_names.append('{}<#eta<{}'.format(self.eta_bins[ieta],
+          self.eta_bins[ieta+1]))
+      pt_plot_data_names.append('Data {}<#eta<{}'.format(self.eta_bins[ieta],
+          self.eta_bins[ieta+1]))
+      pt_plot_mc_names.append('MC {}<#eta<{}'.format(self.eta_bins[ieta],
+          self.eta_bins[ieta+1]))
       eff_pt_plot_data_y.append([])
       eff_pt_plot_data_ey.append([])
       eff_pt_plot_mc_y.append([])
@@ -1832,9 +1628,12 @@ class RmsSFAnalyzer:
     for ipt in range(len(self.pt_bins)-1):
       pt_plot_x.append((self.pt_bins[ipt+1]+self.pt_bins[ipt])/2.0)
       pt_plot_ex.append((self.pt_bins[ipt+1]-self.pt_bins[ipt])/2.0)
-      eta_plot_names.append('{}<p_{{T}}<{} GeV'.format(self.pt_bins[ipt],self.pt_bins[ipt+1]))
-      eta_plot_data_names.append('Data {}<p_{{T}}<{} GeV'.format(self.pt_bins[ipt],self.pt_bins[ipt+1]))
-      eta_plot_mc_names.append('MC {}<p_{{T}}<{} GeV'.format(self.pt_bins[ipt],self.pt_bins[ipt+1]))
+      eta_plot_names.append('{}<p_{{T}}<{} GeV'.format(self.pt_bins[ipt],
+          self.pt_bins[ipt+1]))
+      eta_plot_data_names.append('Data {}<p_{{T}}<{} GeV'.format(
+          self.pt_bins[ipt],self.pt_bins[ipt+1]))
+      eta_plot_mc_names.append('MC {}<p_{{T}}<{} GeV'.format(
+          self.pt_bins[ipt],self.pt_bins[ipt+1]))
       eff_eta_plot_data_y.append([])
       eff_eta_plot_data_ey.append([])
       eff_eta_plot_mc_y.append([])
@@ -1897,178 +1696,108 @@ class RmsSFAnalyzer:
     unc_string = 'Eff. Unc. '+self.data_nom_tnp_analyzer.measurement_desc
     passsf_string = 'Pass SF '+self.data_nom_tnp_analyzer.measurement_desc
     failsf_string = 'Fail SF '+self.data_nom_tnp_analyzer.measurement_desc
-    passunc_string = 'Pass SF Unc. '+self.data_nom_tnp_analyzer.measurement_desc
-    failunc_string = 'Fail SF Unc. '+self.data_nom_tnp_analyzer.measurement_desc
-    for fit_syst in ['data_nom','data_altsig','data_altbkg','data_altsigbkg','mc_nom']:
-      os.system('cp out/{0}_{1}/allfits.pdf out/{0}/{1}_allfits.pdf'.format(self.name,fit_syst))
+    passunc_string = ('Pass SF Unc. '
+                      +self.data_nom_tnp_analyzer.measurement_desc)
+    failunc_string = ('Fail SF Unc. '
+                      +self.data_nom_tnp_analyzer.measurement_desc)
+    for fit_syst in ['data_nom','data_altsig','data_altbkg','data_altsigbkg',
+        'mc_nom']:
+      os.system('cp out/{0}_{1}/allfits.pdf out/{0}/{1}_allfits.pdf'.format(
+          self.name,fit_syst))
     gc.collect()
     gc.disable()
-    file_extension = 'pdf'
-    if is_webversion:
-      file_extension = 'png'
-    make_data_mc_graph(eta_plot_x, eta_plot_ex, eff_eta_plot_data_y, 
-                       eff_eta_plot_data_ey, eff_eta_plot_mc_y, 
-                       eff_eta_plot_mc_ey, 
-                       'out/{0}/{0}_eff_etabinned.{1}'.format(self.name,
-                                                              file_extension), 
-                       eta_plot_data_names, eta_plot_mc_names,
-                       '#eta', eff_string, LUMI_TAGS[self.year])
-    make_data_mc_graph(pt_plot_x, pt_plot_ex, eff_pt_plot_data_y, 
-                       eff_pt_plot_data_ey, eff_pt_plot_mc_y, 
-                       eff_pt_plot_mc_ey, 
-                       'out/{0}/{0}_eff_ptbinned.{1}'.format(self.name,
-                                                             file_extension),
-                       pt_plot_data_names, pt_plot_mc_names,
-                       'p_{T} [GeV]', eff_string, LUMI_TAGS[self.year],True)
-    make_data_mc_graph(gappt_plot_x, gappt_plot_ex, eff_gappt_plot_data_y, 
-                       eff_gappt_plot_data_ey, eff_gappt_plot_mc_y, 
-                       eff_gappt_plot_mc_ey, 
-                       'out/{0}/{0}_eff_gapptbinned.{1}'.format(self.name,
-                           file_extension),
-                       gappt_plot_data_names, gappt_plot_mc_names,
-                       'p_{T} [GeV]', eff_string, LUMI_TAGS[self.year],True)
-    make_heatmap(self.eta_bins, self.pt_bins, eff_pt_plot_data_y, 
-                 'out/{0}/{0}_eff_data.{1}'.format(self.name,file_extension), 
-                 '#eta', 'p_{T} [GeV]', 
-                 eff_string, LUMI_TAGS[self.year],False,True)
-    make_heatmap(self.eta_bins, self.pt_bins, eff_pt_plot_mc_y, 
-                 'out/{0}/{0}_eff_mc.{1}'.format(self.name, file_extension), 
-                 '#eta', 'p_{T} [GeV]',
-                 eff_string, LUMI_TAGS[self.year],False,True)
-    make_sf_graph(eta_plot_x, eta_plot_ex, sf_eta_plot_pass_y, 
-                  sf_eta_plot_pass_ey, 
-                  'out/{0}/{0}_sfpass_etabinned.{1}'.format(self.name, 
-                      file_extension),
-                  eta_plot_names, '#eta', 'Pass SF', LUMI_TAGS[self.year])
-    make_sf_graph(eta_plot_x, eta_plot_ex, sf_eta_plot_fail_y, 
-                  sf_eta_plot_fail_ey, 
-                  'out/{0}/{0}_sffail_etabinned.{1}'.format(self.name, 
-                      file_extension),
-                  eta_plot_names, '#eta', 'Fail SF', LUMI_TAGS[self.year])
-    make_sf_graph(pt_plot_x, pt_plot_ex, sf_pt_plot_pass_y, sf_pt_plot_pass_ey,
-                  'out/{0}/{0}_sfpass_ptbinned.{1}'.format(self.name,
-                      file_extension),
-                  pt_plot_names, 'p_{T} [GeV]', 'Pass SF', LUMI_TAGS[self.year],
-                  True)
-    make_sf_graph(pt_plot_x, pt_plot_ex, sf_pt_plot_fail_y, sf_pt_plot_fail_ey, 
-                  'out/{0}/{0}_sffail_ptbinned.{1}'.format(self.name,
-                      file_extension),
-                  pt_plot_names, 'p_{T} [GeV]', 'Fail SF', LUMI_TAGS[self.year],
-                  True)
-    make_sf_graph(gappt_plot_x, gappt_plot_ex, sf_gappt_plot_pass_y, 
-                  sf_gappt_plot_pass_ey, 
-                  'out/{0}/{0}_sfpass_gapptbinned.{1}'.format(self.name,
-                      file_extension),
-                  gappt_plot_names, 'p_{T} [GeV]', 'Pass SF', 
-                  LUMI_TAGS[self.year], True)
-    make_sf_graph(gappt_plot_x, gappt_plot_ex, sf_gappt_plot_fail_y, 
-                  sf_gappt_plot_fail_ey, 
-                  'out/{0}/{0}_sffail_gapptbinned.{1}'.format(self.name,
-                      file_extension),
-                  gappt_plot_names, 'p_{T} [GeV]', 'Fail SF', 
-                  LUMI_TAGS[self.year], True)
-    make_heatmap(self.eta_bins, self.pt_bins, sf_pt_plot_pass_y, 
-                 'out/{0}/{0}_sfpass.{1}'.format(self.name, file_extension), 
-                 '#eta', 
-                 'p_{T} [GeV]', passsf_string, LUMI_TAGS[self.year], False, 
-                 True)
-    make_heatmap(self.eta_bins, self.pt_bins, sf_pt_plot_fail_y, 
-                 'out/{0}/{0}_sffail.{1}'.format(self.name, file_extension), 
-                 '#eta', 
-                 'p_{T} [GeV]', failsf_string, LUMI_TAGS[self.year], False, 
-                 True)
-    make_heatmap(self.eta_bins, self.pt_bins, sf_pt_plot_pass_ey, 
-                 'out/{0}/{0}_sfpass_unc.{1}'.format(self.name,
-                                                     file_extension), 
-                 '#eta', 
-                 'p_{T} [GeV]', passunc_string, LUMI_TAGS[self.year], False, 
-                 True)
-    make_heatmap(self.eta_bins, self.pt_bins, sf_pt_plot_fail_ey, 
-                 'out/{0}/{0}_sffail_unc.{1}'.format(self.name, 
-                                                     file_extension), 
-                 '#eta', 
-                 'p_{T} [GeV]', failunc_string, LUMI_TAGS[self.year], False, 
-                 True)
-    gc.enable()
-
-  def generate_summary_plots_gap_highpt(self, data_eff: list[float], 
-                                 data_unc: list[float], mc_eff: list[float], 
-                                 mc_unc: list[float], pass_sf: list[float], 
-                                 pass_unc: list[float], fail_sf: list[float], 
-                                 fail_unc: list[float], 
-                                 is_webversion: bool=False):
-    '''generate following plots: highpt 1D efficiency plot with MC & data
-                                 highpt 1D SF plot pass
-                                 highpt 1D SF plot fail
-                                 +all standard for gap
-
-    Args:
-      data_eff: list of data efficiencies
-      data_unc: list of data uncertainties
-      mc_eff: list of mc efficiencies
-      mc_unc: list of mc uncertainties
-      pass_sf: list of scale factors (SFs) for passing selection
-      pass_unc: list of uncertainties on passing SFs
-      fail_sf: list of scale factors for failing selection
-      fail_unc: list of uncertainties on failing SFs
-      is_webvserion: flag to indicate if output should be web-friendly
-    '''
-    self.generate_summary_plots_gap(data_eff, data_unc, mc_eff, mc_unc, 
-        pass_sf, pass_unc, fail_sf, fail_unc, is_webversion)
-
-    highpteta_plot_x = [0.75,2.0]
-    highpteta_plot_ex = [0.75,0.5]
-    highpteta_plot_data_y = [[]]
-    highpteta_plot_data_ey = [[]]
-    highpteta_plot_mc_y = [[]]
-    highpteta_plot_mc_ey = [[]]
-    highpteta_plot_pass_y = [[]]
-    highpteta_plot_pass_ey = [[]]
-    highpteta_plot_fail_y = [[]]
-    highpteta_plot_fail_ey = [[]]
-
-    for ieta in range(2):
-      tnp_bin = ((len(self.pt_bins)-1)*(len(self.eta_bins)-1)
-                 +2*(len(self.gap_pt_bins)-1)+ieta)
-      eff_highpteta_plot_data_y[ieta].append(data_eff[tnp_bin])
-      eff_highpteta_plot_data_ey[ieta].append(data_unc[tnp_bin])
-      eff_highpteta_plot_mc_y[ieta].append(mc_eff[tnp_bin])
-      eff_highpteta_plot_mc_ey[ieta].append(mc_unc[tnp_bin])
-      sf_highpteta_plot_pass_y[ieta].append(pass_sf[tnp_bin])
-      sf_highpteta_plot_pass_ey[ieta].append(pass_unc[tnp_bin])
-      sf_highpteta_plot_fail_y[ieta].append(fail_sf[tnp_bin])
-      sf_highpteta_plot_fail_ey[ieta].append(fail_unc[tnp_bin])
-
-    eff_string = 'Efficiency '+self.data_nom_tnp_analyzer.measurement_desc
-    highpteta_plot_names = ['100<p_{T}<500 GeV']
-    gc.collect()
-    gc.disable()
-    file_extension = 'pdf'
-    if is_webversion:
-      file_extension = 'png'
-
-    make_data_mc_graph(highpteta_plot_x, highpt_eta_plot_ex, 
-                       eff_highpteta_plot_data_y, 
-                       eff_highpteta_plot_data_ey, eff_highpteta_plot_mc_y, 
-                       eff_highpteta_plot_mc_ey, 
-                       'out/{0}/{0}_eff_highptetabinned.{1}'.format(self.name,
-                           file_extension),
-                       ['Data'], ['MC'],
-                       '|#eta|', eff_string, LUMI_TAGS[self.year],True)
-    make_sf_graph(highpteta_plot_x, highpteta_plot_ex, 
-                  sf_highpteta_plot_pass_y, 
-                  sf_highpteta_plot_pass_ey, 
-                  'out/{0}/{0}_sfpass_highptetabinned.{1}'.format(self.name,
-                      file_extension),
-                  highpteta_plot_names, '|#eta|', 'Pass SF', 
-                  LUMI_TAGS[self.year], True)
-    make_sf_graph(highpteta_plot_x, highpteta_plot_ex, 
-                  sf_highpteta_plot_fail_y, 
-                  sf_highpteta_plot_fail_ey, 
-                  'out/{0}/{0}_sffail_highptetabinned.{1}'.format(self.name,
-                      file_extension),
-                  highpteta_plot_names, '|#eta|', 'Fail SF', 
-                  LUMI_TAGS[self.year], True)
+    for file_extension, web_tag in [('pdf',''),('png','web_')]:
+      make_data_mc_graph(eta_plot_x, eta_plot_ex, eff_eta_plot_data_y, 
+                         eff_eta_plot_data_ey, eff_eta_plot_mc_y, 
+                         eff_eta_plot_mc_ey, 
+                         'out/{2}{0}/{0}_eff_etabinned.{1}'.format(self.name,
+                             file_extension, web_tag), 
+                         eta_plot_data_names, eta_plot_mc_names,
+                         '#eta', eff_string, LUMI_TAGS[self.year])
+      make_data_mc_graph(pt_plot_x, pt_plot_ex, eff_pt_plot_data_y, 
+                         eff_pt_plot_data_ey, eff_pt_plot_mc_y, 
+                         eff_pt_plot_mc_ey, 
+                         'out/{2}{0}/{0}_eff_ptbinned.{1}'.format(self.name,
+                             file_extension, web_tag),
+                         pt_plot_data_names, pt_plot_mc_names,
+                         'p_{T} [GeV]', eff_string, LUMI_TAGS[self.year],True)
+      make_data_mc_graph(gappt_plot_x, gappt_plot_ex, eff_gappt_plot_data_y, 
+                         eff_gappt_plot_data_ey, eff_gappt_plot_mc_y, 
+                         eff_gappt_plot_mc_ey, 
+                         'out/{2}{0}/{0}_eff_gapptbinned.{1}'.format(self.name,
+                             file_extension, web_tag),
+                         gappt_plot_data_names, gappt_plot_mc_names,
+                         'p_{T} [GeV]', eff_string, LUMI_TAGS[self.year],True)
+      make_heatmap(self.eta_bins, self.pt_bins, eff_pt_plot_data_y, 
+                   'out/{2}{0}/{0}_eff_data.{1}'.format(self.name,
+                       file_extension, web_tag), 
+                   '#eta', 'p_{T} [GeV]', 
+                   eff_string, LUMI_TAGS[self.year],False,True)
+      make_heatmap(self.eta_bins, self.pt_bins, eff_pt_plot_mc_y, 
+                   'out/{2}{0}/{0}_eff_mc.{1}'.format(self.name, 
+                       file_extension, web_tag), 
+                   '#eta', 'p_{T} [GeV]',
+                   eff_string, LUMI_TAGS[self.year],False,True)
+      make_sf_graph(eta_plot_x, eta_plot_ex, sf_eta_plot_pass_y, 
+                    sf_eta_plot_pass_ey, 
+                    'out/{2}{0}/{0}_sfpass_etabinned.{1}'.format(self.name, 
+                        file_extension, web_tag),
+                    eta_plot_names, '#eta', 'Pass SF', LUMI_TAGS[self.year])
+      make_sf_graph(eta_plot_x, eta_plot_ex, sf_eta_plot_fail_y, 
+                    sf_eta_plot_fail_ey, 
+                    'out/{2}{0}/{0}_sffail_etabinned.{1}'.format(self.name, 
+                        file_extension, web_tag),
+                    eta_plot_names, '#eta', 'Fail SF', LUMI_TAGS[self.year])
+      make_sf_graph(pt_plot_x, pt_plot_ex, sf_pt_plot_pass_y, 
+                    sf_pt_plot_pass_ey,
+                    'out/{2}{0}/{0}_sfpass_ptbinned.{1}'.format(self.name,
+                        file_extension, web_tag),
+                    pt_plot_names, 'p_{T} [GeV]', 'Pass SF', 
+                    LUMI_TAGS[self.year],
+                    True)
+      make_sf_graph(pt_plot_x, pt_plot_ex, sf_pt_plot_fail_y, 
+                    sf_pt_plot_fail_ey, 
+                    'out/{2}{0}/{0}_sffail_ptbinned.{1}'.format(self.name,
+                        file_extension, web_tag),
+                    pt_plot_names, 'p_{T} [GeV]', 'Fail SF', 
+                    LUMI_TAGS[self.year],
+                    True)
+      make_sf_graph(gappt_plot_x, gappt_plot_ex, sf_gappt_plot_pass_y, 
+                    sf_gappt_plot_pass_ey, 
+                    'out/{2}{0}/{0}_sfpass_gapptbinned.{1}'.format(self.name,
+                        file_extension, web_tag),
+                    gappt_plot_names, 'p_{T} [GeV]', 'Pass SF', 
+                    LUMI_TAGS[self.year], True)
+      make_sf_graph(gappt_plot_x, gappt_plot_ex, sf_gappt_plot_fail_y, 
+                    sf_gappt_plot_fail_ey, 
+                    'out/{2}{0}/{0}_sffail_gapptbinned.{1}'.format(self.name,
+                        file_extension, web_tag),
+                    gappt_plot_names, 'p_{T} [GeV]', 'Fail SF', 
+                    LUMI_TAGS[self.year], True)
+      make_heatmap(self.eta_bins, self.pt_bins, sf_pt_plot_pass_y, 
+                   'out/{2}{0}/{0}_sfpass.{1}'.format(self.name, 
+                       file_extension, web_tag), 
+                   '#eta', 
+                   'p_{T} [GeV]', passsf_string, LUMI_TAGS[self.year], False, 
+                   True)
+      make_heatmap(self.eta_bins, self.pt_bins, sf_pt_plot_fail_y, 
+                   'out/{2}{0}/{0}_sffail.{1}'.format(self.name, 
+                       file_extension, web_tag), 
+                   '#eta', 
+                   'p_{T} [GeV]', failsf_string, LUMI_TAGS[self.year], False, 
+                   True)
+      make_heatmap(self.eta_bins, self.pt_bins, sf_pt_plot_pass_ey, 
+                   'out/{2}{0}/{0}_sfpass_unc.{1}'.format(self.name,
+                       file_extension, web_tag), 
+                   '#eta', 
+                   'p_{T} [GeV]', passunc_string, LUMI_TAGS[self.year], False, 
+                   True)
+      make_heatmap(self.eta_bins, self.pt_bins, sf_pt_plot_fail_ey, 
+                   'out/{2}{0}/{0}_sffail_unc.{1}'.format(self.name, 
+                       file_extension, web_tag), 
+                   '#eta', 
+                   'p_{T} [GeV]', failunc_string, LUMI_TAGS[self.year], False, 
+                   True)
     gc.enable()
 
   def run_interactive(self, gamma_add_gauss: bool=False):
@@ -2162,8 +1891,6 @@ class RmsSFAnalyzer:
         exit_loop = True
       elif (user_input[0] == 'c' or user_input[0] == 'clean'):
         self.clean_output()
-      elif (user_input[0] == 'w' or user_input[0] == 'weboutput'):
-        self.generate_web_output()
       elif (user_input[0] == 'v' or user_input[0] == 'previous'):
         for past_command in past_commands:
           print(past_command)

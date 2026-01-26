@@ -4,6 +4,7 @@
 
 from rms_sf_analyzer import RmsSFAnalyzer
 from argparse import ArgumentParser
+from bin_utils import add_standard_gap_highpt_binning
 
 def modify_tag_lowpt(analyzer: RmsSFAnalyzer, pt_bins: list[float], 
                      eta_bins: list[float], gap_pt_bins: list[float]):
@@ -150,7 +151,8 @@ if __name__=='__main__':
   elid_analyzer.set_measurement_variable(measurement_cut,measurement_desc)
   elid_analyzer.set_preselection(preselection,preselection_mc,preselection)
   if (year != '2023BPixHole'):
-    elid_analyzer.add_standard_gap_highpt_binning([7.0,15.0,20.0,35.0,50.0,100.0],
+    add_standard_gap_highpt_binning(elid_analyzer, 
+        [7.0,15.0,20.0,35.0,50.0,100.0],
         [-2.5,-2.0,-1.5,-0.8,0.0,0.8,1.5,2.0,2.5],[7.0,35.0,500.0],'el_pt',
         'el_sc_eta')
     modify_tag_lowpt(elid_analyzer, [7.0,15.0,20.0,35.0,50.0,100.0],

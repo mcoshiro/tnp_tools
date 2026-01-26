@@ -268,6 +268,39 @@ def bin_wilson_ci(n_pass: float, n_fail: float) -> tuple[float,float]:
   upper = (-1.0*b+sqrt(b**2-4.0*a*c))/2.0/a
   return (lower, upper)
 
+def make_heatmap(x: list[float], y: list[float], z: list[float], name: str, 
+                 x_title: str, y_title: str, z_title: str, 
+                 lumi: list[tuple[float,float]], log_x: bool=False, 
+                 log_y: bool=False):
+  '''Makes a heatmap (2D histogram/colz)
+
+  Args:
+    x: x axis bin divisions
+    y: y axis bin divisions
+    z: heatmap values
+    name: filename
+    x_title: x-axis label
+    y_title: y-axis label
+    z_title: z-axis label
+    lumi: list of tuple of two floats representing lumi and CM energy
+    log_x: if true sets x-axis to be logarithmic
+    log_y: if true sets y-axis to be logarithmic
+  '''
+  x_bins = array('d',x)
+  y_bins = array('d',y)
+  hist = ROOT.TH2D('heatmap',';'+x_title+';'+y_title+';'+z_title,
+                   len(x)-1,x_bins,len(y)-1,y_bins)
+  for ix in range(len(x)-1):
+    for iy in range(len(y)-1):
+      hist.SetBinContent(ix+1, iy+1, z[ix][iy])
+  sf_plot = RplPlot()
+  sf_plot.lumi_data = lumi
+  sf_plot.plot_colormap(hist)
+  sf_plot.log_x = log_x
+  sf_plot.log_y = log_y
+  sf_plot.draw(name)
+
+
 def remove_negative_bins(hist: ROOT.TH1D) -> ROOT.TH1D:
   """Returns copy of histogram with negative bins zeroed
 
