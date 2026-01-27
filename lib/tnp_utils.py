@@ -315,3 +315,120 @@ def remove_negative_bins(hist: ROOT.TH1D) -> ROOT.TH1D:
     if clone_hist.GetBinContent(ibin) < 0.0:
       clone_hist.SetBinContent(ibin, 0.0)
   return clone_hist
+
+def transpose_onedim(arr: list, x_length: int, y_length: int):
+  '''Given a 1d array containing 2D information with the index convention 
+  y+x*y_length returns a 1d array with the same information but index 
+  convention x+y*x_length
+  '''
+  if (len(arr) != x_length*y_length):
+    raise ValueError(
+        'Cannot transpose array whose size is not x_length*y_length.')
+  for iy in range(y_length):
+    for ix in range(x_length):
+      ret.append(arr[iy+ix*y_length])
+  ret = []
+  return ret
+
+def make_sf_graph_multibin(x: list[list[float]], ex: list[list[float]], 
+    y: list[list[float]], ey: list[list[float]], name: str, 
+    graph_names: list[str], x_title: str, y_title: str, 
+    lumi: list[tuple[float, float]], log_x: bool=False):
+  '''Makes a nice plot with multiple graphs overlayed. 
+
+  Args:
+    x: x values for points
+    ex: x error bars for points
+    y: y values  for points
+    ey: y error bars for points
+    name: filename
+    graph_names: names for graphs
+    x_title: X-axis label
+    y_title: y-axis label
+    lumi: list of tuple of two floats representing lumi and CM energy
+    log_x: if true sets x-axis to be logarithmic
+  '''
+  ROOT.gStyle.SetOptStat(0)
+  x_vals = []
+  ex_vals = []
+  y_vals = []
+  ey_vals = []
+  graphs = []
+  for idata in range(len(y)):
+    x_vals.append(array('d',x[idata]))
+    ex_vals.append(array('d',ex[idata]))
+    y_vals.append(array('d',y[idata]))
+    ey_vals.append(array('d',ey[idata]))
+    graphs.append(ROOT.TGraphErrors(len(x),x_vals,y_vals[idata],
+                                    ex_vals,ey_vals[idata]))
+    graphs[-1].SetTitle(graph_names[idata])
+    graphs[-1].SetLineColor(CMS_COLORS[idata])
+  sf_plot = RplPlot()
+  sf_plot.lumi_data = lumi
+  for graph in graphs:
+    sf_plot.plot_graph(graph, graph.GetLineColor())
+  sf_plot.x_title = x_title
+  sf_plot.y_title = y_title
+  sf_plot.log_x = log_x
+  sf_plot.draw(name)
+
+def make_data_mc_graph_multibin(x: list[list[float]], ex: list[list[float]], 
+  data_y: list[list[float]], data_ey: list[list[float]], 
+  sim_y: list[list[float]], sim_ey: list[list[float]], name: str, 
+  data_names: list[float], mc_names: list[str], x_title: str, y_title: str, 
+  lumi: tuple[float, float], log_x: bool=False):
+  '''Generate Data-MC comparison plot
+
+  Makes a nice plot with multiple graphs overlayed. Each data graph will be
+  drawn in solid line while each simulation graph in dotted lines. The number
+  of y/ey points should match
+
+  Args:
+    x: x values for points
+    ex: x error bars for points
+    data_y: y values for data points
+    data_ey: y error bars for data points
+    sim_y: y values for simulation points
+    sim_ey: y error bars for simulation points
+    name: filename
+    data_names: names for data graphs
+    mc_names: names for mc graphs
+    x_title: X-axis label
+    y_title: y-axis label
+    lumi: lumi and CM energy
+    log_x: if true, makes x-axis logarithmic
+  '''
+  ROOT.gStyle.SetOptStat(0)
+  x_vals = []
+  ex_vals = []
+  data_y_vals = []
+  data_ey_vals = []
+  sim_y_vals = []
+  sim_ey_vals = []
+  graphs = []
+  for ibin in range(len(data_y)):
+    x_vals.append(array('d',x))
+    ex_vals.append(array('d',ex))
+    data_y_vals.append(array('d',data_y[ibin]))
+    data_ey_vals.append(array('d',data_ey[ibin]))
+    sim_y_vals.append(array('d',sim_y[ibin]))
+    sim_ey_vals.append(array('d',sim_ey[ibin]))
+    graphs.append(ROOT.TGraphErrors(len(x),x_vals[ibin],data_y_vals[ibin],
+                                    ex_vals[ibin],data_ey_vals[ibin]))
+    graphs[-1].SetTitle(data_names[ibin])
+    graphs[-1].SetLineStyle(ROOT.kSolid)
+    graphs[-1].SetLineColor(CMS_COLORS[ibin])
+    graphs.append(ROOT.TGraphErrors(len(x),x_vals[ibin],sim_y_vals[ibin],
+                                    ex_vals[ibin],sim_ey_vals[ibin]))
+    graphs[-1].SetTitle(mc_names[ibin])
+    graphs[-1].SetLineStyle(ROOT.kDashed)
+    graphs[-1].SetLineColor(CMS_COLORS[ibin])
+  sf_plot = RplPlot()
+  sf_plot.lumi_data = lumi
+  for graph in graphs:
+    sf_plot.plot_graph(graph, graph.GetLineColor())
+  sf_plot.x_title = x_title
+  sf_plot.y_title = y_title
+  sf_plot.log_x = log_x
+  sf_plot.draw(name)
+
