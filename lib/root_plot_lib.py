@@ -591,5 +591,8 @@ class RplPlot:
     #draw everything and save
     can.Draw()
     can.SaveAs(filename)
+    #ROOT.SetOwnership(can, False)
+    #ROOT.SetOwnership(top_pad, False)
+    #ROOT.SetOwnership(bot_pad, False)
     return self
 
