@@ -3,9 +3,10 @@ Functions implementing various custom binning schemes for T&P analyses
 """
 
 from array import array
-from correctionlib import schemav2 
 from functools import partial
 import ROOT
+import os
+import gc
 
 from tnp_utils import *
 from rms_sf_analyzer import RmsSFAnalyzer
@@ -45,7 +46,7 @@ def add_standard_gap_highpt_binning(analyzer: RmsSFAnalyzer,
         bin_selections.append(f'{gap_pt_bins[ipt]}<{pt_var_name}'
             +f'&&{pt_var_name}<{gap_pt_bins[ipt+1]}&&{eta_lo}<{eta_var_name}'
             +f'&&{eta_var_name}<{eta_hi}')
-        bin_selections.append(f'{gap_pt_bins[ipt]}<p_{{T}}'
+        bin_names.append(f'{gap_pt_bins[ipt]}<p_{{T}}'
             +f'<{gap_pt_bins[ipt+1]} GeV, {eta_lo}<#eta<{eta_hi}')
         if (pt_bins[ipt]>70.0):
           is_high_pt.append(True)
@@ -131,7 +132,7 @@ def generate_jsons_plots_gap_highpt(self, data_eff: list[float],
 
   num_bins_pt = len(pt_bins)-1
   num_bins_eta = len(eta_bins)-1
-  num_bins_ptgap = len(gap_pt_bins)
+  num_bins_ptgap = len(gap_pt_bins)-1
 
   for ipt in range(num_bins_pt+1):
     mean_bin_pt = (pt_bins[ipt]+pt_bins[ipt+1])/2.0
@@ -166,18 +167,18 @@ def generate_jsons_plots_gap_highpt(self, data_eff: list[float],
       json_dat_unc.append(data_unc[tnp_bin])
       json_sim_eff.append(mc_eff[tnp_bin])
       json_sim_unc.append(mc_unc[tnp_bin])
-  pteta_dateff = transpose_onedim(json_dat_eff, num_bins_pt+1, 
-                                  num_bins_eta+2)
-  pteta_simeff = transpose_onedim(json_sim_eff, num_bins_pt+1, 
-                                  num_bins_eta+2)
-  pteta_sfpass = transpose_onedim(pass_json_sfs, num_bins_pt+1, 
-                                  num_bins_eta+2)
-  pteta_sffail = transpose_onedim(fail_json_sfs, num_bins_pt+1, 
-                                  num_bins_eta+2)
-  pteta_unpass = transpose_onedim(pass_json_uns, num_bins_pt+1, 
-                                  num_bins_eta+2)
-  pteta_unfail = transpose_onedim(fail_json_uns, num_bins_pt+1, 
-                                  num_bins_eta+2)
+  pteta_dateff = onedim_to_twodim(transpose_onedim(json_dat_eff, num_bins_pt+1, 
+      num_bins_eta+2), num_bins_pt+1, num_bins_eta+2)
+  pteta_simeff = onedim_to_twodim(transpose_onedim(json_sim_eff, num_bins_pt+1, 
+      num_bins_eta+2), num_bins_pt+1, num_bins_eta+2)
+  pteta_sfpass = onedim_to_twodim(transpose_onedim(pass_json_sfs, 
+      num_bins_pt+1, num_bins_eta+2), num_bins_pt+1, num_bins_eta+2)
+  pteta_sffail = onedim_to_twodim(transpose_onedim(fail_json_sfs, 
+      num_bins_pt+1, num_bins_eta+2), num_bins_pt+1, num_bins_eta+2)
+  pteta_unpass = onedim_to_twodim(transpose_onedim(pass_json_uns, 
+      num_bins_pt+1, num_bins_eta+2), num_bins_pt+1, num_bins_eta+2)
+  pteta_unfail = onedim_to_twodim(transpose_onedim(fail_json_uns, 
+      num_bins_pt+1, num_bins_eta+2), num_bins_pt+1, num_bins_eta+2)
 
   #get info for pt-binned plots
   for ieta in range(num_bins_eta):
@@ -198,24 +199,24 @@ def generate_jsons_plots_gap_highpt(self, data_eff: list[float],
     ptplot_dateff[1].append([])
     ptplot_simeff[0].append([])
     ptplot_simeff[1].append([])
-    ptplot_passsf[0].append([])
-    ptplot_passsf[1].append([])
-    ptplot_failsf[0].append([])
-    ptplot_failsf[1].append([])
+    ptplot_sfpass[0].append([])
+    ptplot_sfpass[1].append([])
+    ptplot_sffail[0].append([])
+    ptplot_sffail[1].append([])
     for ipt in range(num_bins_pt):
       tnp_bin = ipt*num_bins_eta+ieta
       pt_mean = (pt_bins[ipt+1]+pt_bins[ipt])/2.0
       pt_diff = (pt_bins[ipt+1]-pt_bins[ipt])/2.0
-      ptplot_x[0][ieta].append(pt_mean)
-      ptplot_x[1][ieta].append(pt_diff)
-      ptplot_dateff[0][ieta].append(data_eff[tnp_bin])
-      ptplot_dateff[1][ieta].append(data_unc[tnp_bin])
-      ptplot_simeff[0][ieta].append(mc_eff[tnp_bin])
-      ptplot_simeff[1][ieta].append(mc_unc[tnp_bin])
-      ptplot_passsf[0][ieta].append(pass_sf[tnp_bin])
-      ptplot_passsf[1][ieta].append(pass_unc[tnp_bin])
-      ptplot_failsf[0][ieta].append(fail_sf[tnp_bin])
-      ptplot_failsf[1][ieta].append(fail_unc[tnp_bin])
+      ptplot_x[0][-1].append(pt_mean)
+      ptplot_x[1][-1].append(pt_diff)
+      ptplot_dateff[0][-1].append(data_eff[tnp_bin])
+      ptplot_dateff[1][-1].append(data_unc[tnp_bin])
+      ptplot_simeff[0][-1].append(mc_eff[tnp_bin])
+      ptplot_simeff[1][-1].append(mc_unc[tnp_bin])
+      ptplot_sfpass[0][-1].append(pass_sf[tnp_bin])
+      ptplot_sfpass[1][-1].append(pass_unc[tnp_bin])
+      ptplot_sffail[0][-1].append(fail_sf[tnp_bin])
+      ptplot_sffail[1][-1].append(fail_unc[tnp_bin])
   eta_gap_lo = [-1.566, 1.4442]
   eta_gap_hi = [-1.4442, 1.566]
   for ieta in range(2):
@@ -226,24 +227,24 @@ def generate_jsons_plots_gap_highpt(self, data_eff: list[float],
     ptplot_dateff[1].append([])
     ptplot_simeff[0].append([])
     ptplot_simeff[1].append([])
-    ptplot_passsf[0].append([])
-    ptplot_passsf[1].append([])
-    ptplot_failsf[0].append([])
-    ptplot_failsf[1].append([])
+    ptplot_sfpass[0].append([])
+    ptplot_sfpass[1].append([])
+    ptplot_sffail[0].append([])
+    ptplot_sffail[1].append([])
     for ipt in range(num_bins_ptgap):
       tnp_bin = num_bins_pt*num_bins_eta+ipt*2+ieta
       pt_mean = (gap_pt_bins[ipt+1]+gap_pt_bins[ipt])/2.0
       pt_diff = (gap_pt_bins[ipt+1]-gap_pt_bins[ipt])/2.0
-      ptplot_x[0][ieta].append(pt_mean)
-      ptplot_x[1][ieta].append(pt_diff)
-      ptplot_dateff[0][ieta].append(data_eff[tnp_bin])
-      ptplot_dateff[1][ieta].append(data_unc[tnp_bin])
-      ptplot_simeff[0][ieta].append(mc_eff[tnp_bin])
-      ptplot_simeff[1][ieta].append(mc_unc[tnp_bin])
-      ptplot_passsf[0][ieta].append(pass_sf[tnp_bin])
-      ptplot_passsf[1][ieta].append(pass_unc[tnp_bin])
-      ptplot_failsf[0][ieta].append(fail_sf[tnp_bin])
-      ptplot_failsf[1][ieta].append(fail_unc[tnp_bin])
+      ptplot_x[0][-1].append(pt_mean)
+      ptplot_x[1][-1].append(pt_diff)
+      ptplot_dateff[0][-1].append(data_eff[tnp_bin])
+      ptplot_dateff[1][-1].append(data_unc[tnp_bin])
+      ptplot_simeff[0][-1].append(mc_eff[tnp_bin])
+      ptplot_simeff[1][-1].append(mc_unc[tnp_bin])
+      ptplot_sfpass[0][-1].append(pass_sf[tnp_bin])
+      ptplot_sfpass[1][-1].append(pass_unc[tnp_bin])
+      ptplot_sffail[0][-1].append(fail_sf[tnp_bin])
+      ptplot_sffail[1][-1].append(fail_unc[tnp_bin])
   highpt_eta_names = ['|#eta|<1.4442', '|#eta|>1.566']
   for ieta in range(2):
     ptplot_names.append(highpt_eta_names[ieta])
@@ -256,26 +257,26 @@ def generate_jsons_plots_gap_highpt(self, data_eff: list[float],
     ptplot_dateff[1].append([data_unc[tnp_bin]])
     ptplot_simeff[0].append([mc_eff[tnp_bin]])
     ptplot_simeff[1].append([mc_unc[tnp_bin]])
-    ptplot_passsf[0].append([pass_sf[tnp_bin]])
-    ptplot_passsf[1].append([pass_unc[tnp_bin]])
-    ptplot_failsf[0].append([fail_sf[tnp_bin]])
-    ptplot_failsf[1].append([fail_unc[tnp_bin]])
+    ptplot_sfpass[0].append([pass_sf[tnp_bin]])
+    ptplot_sfpass[1].append([pass_unc[tnp_bin]])
+    ptplot_sffail[0].append([fail_sf[tnp_bin]])
+    ptplot_sffail[1].append([fail_unc[tnp_bin]])
 
   #get info for eta-binned plots
   for ipt in range(num_bins_pt):
     pt_lo = pt_bins[ipt]
     pt_hi = pt_bins[ipt+1]
-    etaplot_names.append(f'{pt_lo}<#pt<{pt_hi} GeV')
+    etaplot_names.append(f'{pt_lo}<p_{{T}}<{pt_hi} GeV')
     etaplot_x[0].append([])
     etaplot_x[1].append([])
     etaplot_dateff[0].append([])
     etaplot_dateff[1].append([])
     etaplot_simeff[0].append([])
     etaplot_simeff[1].append([])
-    etaplot_passsf[0].append([])
-    etaplot_passsf[1].append([])
-    etaplot_failsf[0].append([])
-    etaplot_failsf[1].append([])
+    etaplot_sfpass[0].append([])
+    etaplot_sfpass[1].append([])
+    etaplot_sffail[0].append([])
+    etaplot_sffail[1].append([])
     for ieta in range(num_bins_eta):
       tnp_bin = ipt*num_bins_eta+ieta
       eta_lo = eta_bins[ieta]
@@ -290,42 +291,42 @@ def generate_jsons_plots_gap_highpt(self, data_eff: list[float],
         eta_hi = 1.4442
       eta_mean = (eta_hi+eta_lo)/2.0
       eta_diff = (eta_hi-eta_lo)/2.0
-      etaplot_x[0][ipt].append(eta_mean)
-      etaplot_x[1][ipt].append(eta_diff)
-      etaplot_dateff[0][ipt].append(data_eff[tnp_bin])
-      etaplot_dateff[1][ipt].append(data_unc[tnp_bin])
-      etaplot_simeff[0][ipt].append(mc_eff[tnp_bin])
-      etaplot_simeff[1][ipt].append(mc_unc[tnp_bin])
-      etaplot_passsf[0][ipt].append(pass_sf[tnp_bin])
-      etaplot_passsf[1][ipt].append(pass_unc[tnp_bin])
-      etaplot_failsf[0][ipt].append(fail_sf[tnp_bin])
-      etaplot_failsf[1][ipt].append(fail_unc[tnp_bin])
+      etaplot_x[0][-1].append(eta_mean)
+      etaplot_x[1][-1].append(eta_diff)
+      etaplot_dateff[0][-1].append(data_eff[tnp_bin])
+      etaplot_dateff[1][-1].append(data_unc[tnp_bin])
+      etaplot_simeff[0][-1].append(mc_eff[tnp_bin])
+      etaplot_simeff[1][-1].append(mc_unc[tnp_bin])
+      etaplot_sfpass[0][-1].append(pass_sf[tnp_bin])
+      etaplot_sfpass[1][-1].append(pass_unc[tnp_bin])
+      etaplot_sffail[0][-1].append(fail_sf[tnp_bin])
+      etaplot_sffail[1][-1].append(fail_unc[tnp_bin])
   for ipt in range(num_bins_ptgap):
-    etaplot_names.append(f'{gap_pt_bins[ipt]}<p_{T}<{gap_pt_bins[ipt+1]} GeV')
+    etaplot_names.append(f'{gap_pt_bins[ipt]}<p_{{T}}<{gap_pt_bins[ipt+1]} GeV')
     etaplot_x[0].append([])
     etaplot_x[1].append([])
     etaplot_dateff[0].append([])
     etaplot_dateff[1].append([])
     etaplot_simeff[0].append([])
     etaplot_simeff[1].append([])
-    etaplot_passsf[0].append([])
-    etaplot_passsf[1].append([])
-    etaplot_failsf[0].append([])
-    etaplot_failsf[1].append([])
+    etaplot_sfpass[0].append([])
+    etaplot_sfpass[1].append([])
+    etaplot_sffail[0].append([])
+    etaplot_sffail[1].append([])
     for ieta in range(2):
       tnp_bin = num_bins_eta*num_bins_pt+ipt*2+ieta
-      eta_mean = (gap_gap_hi[ieta]+eta_gap_lo[ieta])/2.0
-      eta_diff = (gap_gap_hi[ieta]-eta_gap_lo[ieta])/2.0
-      etaplot_x[0][ipt].append(eta_mean)
-      etaplot_x[1][ipt].append(eta_diff)
-      etaplot_dateff[0][ipt].append(data_eff[tnp_bin])
-      etaplot_dateff[1][ipt].append(data_unc[tnp_bin])
-      etaplot_simeff[0][ipt].append(mc_eff[tnp_bin])
-      etaplot_simeff[1][ipt].append(mc_unc[tnp_bin])
-      etaplot_passsf[0][ipt].append(pass_sf[tnp_bin])
-      etaplot_passsf[1][ipt].append(pass_unc[tnp_bin])
-      etaplot_failsf[0][ipt].append(fail_sf[tnp_bin])
-      etaplot_failsf[1][ipt].append(fail_unc[tnp_bin])
+      eta_mean = (eta_gap_hi[ieta]+eta_gap_lo[ieta])/2.0
+      eta_diff = (eta_gap_hi[ieta]-eta_gap_lo[ieta])/2.0
+      etaplot_x[0][-1].append(eta_mean)
+      etaplot_x[1][-1].append(eta_diff)
+      etaplot_dateff[0][-1].append(data_eff[tnp_bin])
+      etaplot_dateff[1][-1].append(data_unc[tnp_bin])
+      etaplot_simeff[0][-1].append(mc_eff[tnp_bin])
+      etaplot_simeff[1][-1].append(mc_unc[tnp_bin])
+      etaplot_sfpass[0][-1].append(pass_sf[tnp_bin])
+      etaplot_sfpass[1][-1].append(pass_unc[tnp_bin])
+      etaplot_sffail[0][-1].append(fail_sf[tnp_bin])
+      etaplot_sffail[1][-1].append(fail_unc[tnp_bin])
   etaplot_names.append('100<p_{T}<500 GeV')
   tnp_bin = num_bins_eta*num_bins_pt+num_bins_ptgap*2
   etaplot_x[0].append([-2.033, 0.0, 2.033])
@@ -338,13 +339,13 @@ def generate_jsons_plots_gap_highpt(self, data_eff: list[float],
                             mc_eff[tnp_bin+1]])
   etaplot_simeff[1].append([mc_unc[tnp_bin+1], mc_unc[tnp_bin], 
                             mc_unc[tnp_bin+1]])
-  etaplot_passsf[0].append([pass_sf[tnp_bin+1], pass_sf[tnp_bin], 
+  etaplot_sfpass[0].append([pass_sf[tnp_bin+1], pass_sf[tnp_bin], 
                             pass_sf[tnp_bin+1]])
-  etaplot_passsf[1].append([pass_unc[tnp_bin+1], pass_unc[tnp_bin], 
+  etaplot_sfpass[1].append([pass_unc[tnp_bin+1], pass_unc[tnp_bin], 
                             pass_unc[tnp_bin+1]])
-  etaplot_failsf[0].append([fail_sf[tnp_bin+1], fail_sf[tnp_bin], 
+  etaplot_sffail[0].append([fail_sf[tnp_bin+1], fail_sf[tnp_bin], 
                             fail_sf[tnp_bin+1]])
-  etaplot_failsf[1].append([fail_unc[tnp_bin+1], fail_unc[tnp_bin], 
+  etaplot_sffail[1].append([fail_unc[tnp_bin+1], fail_unc[tnp_bin], 
                             fail_unc[tnp_bin+1]])
 
   if not os.path.isdir('out/'+name):
@@ -352,21 +353,22 @@ def generate_jsons_plots_gap_highpt(self, data_eff: list[float],
     os.mkdir('out/'+name)
 
   #write JSON
-  clib_sfs_pass = make_correction('sf_pass', 'data-MC SF', pt_bins, 
+  aug_pt_bins = pt_bins + [500.0]
+  clib_sfs_pass = make_correction('sf_pass', 'data-MC SF', aug_pt_bins, 
                                   gapincl_eta_bins, pass_json_sfs)
-  clib_uns_pass = make_correction('unc_pass', 'data-MC unc', pt_bins, 
+  clib_uns_pass = make_correction('unc_pass', 'data-MC unc', aug_pt_bins, 
                                   gapincl_eta_bins, pass_json_uns)
-  clib_sfs_fail = make_correction('sf_fail', 'data-MC SF', pt_bins, 
+  clib_sfs_fail = make_correction('sf_fail', 'data-MC SF', aug_pt_bins, 
                                   gapincl_eta_bins, fail_json_sfs)
-  clib_uns_fail = make_correction('unc_fail', 'data-MC unc', pt_bins, 
+  clib_uns_fail = make_correction('unc_fail', 'data-MC unc', aug_pt_bins, 
                                   gapincl_eta_bins, fail_json_uns)
-  clib_dat_eff = make_correction('effdata', 'data eff', pt_bins, 
+  clib_dat_eff = make_correction('effdata', 'data eff', aug_pt_bins, 
                                  gapincl_eta_bins, json_dat_eff)
-  clib_dat_unc = make_correction('systdata', 'data unc', pt_bins, 
+  clib_dat_unc = make_correction('systdata', 'data unc', aug_pt_bins, 
                                  gapincl_eta_bins, json_dat_unc)
-  clib_sim_eff = make_correction('effmc', 'MC eff', pt_bins, 
+  clib_sim_eff = make_correction('effmc', 'MC eff', aug_pt_bins, 
                                  gapincl_eta_bins, json_sim_eff)
-  clib_sim_unc = make_correction('systmc', 'MC unc', pt_bins, 
+  clib_sim_unc = make_correction('systmc', 'MC unc', aug_pt_bins, 
                                  gapincl_eta_bins, json_sim_unc)
 
   sf_filename = 'out/{0}/{0}_scalefactors.json'.format(name)
@@ -395,12 +397,9 @@ def generate_jsons_plots_gap_highpt(self, data_eff: list[float],
   ptplot_sim_names = [f'MC {name}' for name in ptplot_names]
   etaplot_dat_names = [f'Data {name}' for name in etaplot_names]
   etaplot_sim_names = [f'MC {name}' for name in etaplot_names]
+
   gc.collect()
   gc.disable()
-  file_extension = 'pdf'
-  if is_webversion:
-    file_extension = 'png'
-
   for file_extension, web_tag in [('pdf',''),('png','web_')]:
     #2D plots
     for plot_data, plot_name, plot_desc in [
@@ -411,38 +410,38 @@ def generate_jsons_plots_gap_highpt(self, data_eff: list[float],
         (pteta_unpass, '_sfpass_unc', passun_string),
         (pteta_unfail, '_sffail_unc', failun_string)]:
       make_heatmap(gapincl_eta_bins, pt_bins, pteta_dataeff, 
-                   f'out/{web_tag}{name}/{name}_eff_data.{file_extension}'
+                   f'out/{web_tag}{name}/{name}_{plot_name}.{file_extension}',
                    '#eta', 'p_{T} [GeV]', 
-                   eff_string, LUMI_TAGS[year],False,True)
+                   plot_desc, LUMI_TAGS[year],False,True)
     #1D plots
     make_data_mc_graph_multibin(ptplot_x[0], ptplot_x[1], 
-        ptplot_dateff_y[0], ptplot_dateff_y[1], ptplot_simeff_y[0],
-        ptplot_simeff_y[1], 
+        ptplot_dateff[0], ptplot_dateff[1], ptplot_simeff[0],
+        ptplot_simeff[1], 
         f'out/{web_tag}{name}/{name}_eff_ptbinned.{file_extension}',
         ptplot_dat_names, ptplot_sim_names, 'p_{T} [GeV]', eff_string,
-        LUMI_TAGS[years], True)
+        LUMI_TAGS[year], True)
     make_data_mc_graph_multibin(etaplot_x[0], etaplot_x[1], 
-        etaplot_dateff_y[0], etaplot_dateff_y[1], etaplot_simeff_y[0],
-        etaplot_simeff_y[1], 
+        etaplot_dateff[0], etaplot_dateff[1], etaplot_simeff[0],
+        etaplot_simeff[1], 
         f'out/{web_tag}{name}/{name}_eff_etabinned.{file_extension}',
         etaplot_dat_names, etaplot_sim_names, '#eta', eff_string,
-        LUMI_TAGS[years], False)
+        LUMI_TAGS[year], False)
     make_sf_graph_multibin(ptplot_x[0], ptplot_x[1], 
-        ptplot_sfpass_y[0], ptplot_sfpass_y[1], 
+        ptplot_sfpass[0], ptplot_sfpass[1], 
         f'out/{web_tag}{name}/{name}_sfpass_ptbinned.{file_extension}',
-        ptplot_names, 'p_{T} [GeV]', passsf_string, LUMI_TAGS[years], True)
+        ptplot_names, 'p_{T} [GeV]', passsf_string, LUMI_TAGS[year], True)
     make_sf_graph_multibin(ptplot_x[0], ptplot_x[1], 
-        ptplot_sffail_y[0], ptplot_sffail_y[1], 
+        ptplot_sffail[0], ptplot_sffail[1], 
         f'out/{web_tag}{name}/{name}_sffail_ptbinned.{file_extension}',
-        ptplot_names, 'p_{T} [GeV]', failsf_string, LUMI_TAGS[years], True)
+        ptplot_names, 'p_{T} [GeV]', failsf_string, LUMI_TAGS[year], True)
     make_sf_graph_multibin(etaplot_x[0], etaplot_x[1], 
-        etaplot_sfpass_y[0], etaplot_sfpass_y[1], 
+        etaplot_sfpass[0], etaplot_sfpass[1], 
         f'out/{web_tag}{name}/{name}_sfpass_etabinned.{file_extension}',
-        etaplot_names, 'p_{T} [GeV]', passsf_string, LUMI_TAGS[years], False)
+        etaplot_names, '#eta', passsf_string, LUMI_TAGS[year], False)
     make_sf_graph_multibin(etaplot_x[0], etaplot_x[1], 
-        etaplot_sffail_y[0], etaplot_sffail_y[1], 
+        etaplot_sffail[0], etaplot_sffail[1], 
         f'out/{web_tag}{name}/{name}_sffail_etabinned.{file_extension}',
-        etaplot_names, 'p_{T} [GeV]', failsf_string, LUMI_TAGS[years], False)
+        etaplot_names, '#eta', failsf_string, LUMI_TAGS[year], False)
 
   gc.enable()
 
@@ -489,7 +488,7 @@ def add_standard_gap_lohipt_binning(analyzer: RmsSFAnalyzer,
         bin_selections.append(f'{gap_pt_bins[ipt]}<{pt_var_name}'
             +f'&&{pt_var_name}<{gap_pt_bins[ipt+1]}&&{eta_lo}<{eta_var_name}'
             +f'&&{eta_var_name}<{eta_hi}')
-        bin_selections.append(f'{gap_pt_bins[ipt]}<p_{{T}}'
+        bin_names.append(f'{gap_pt_bins[ipt]}<p_{{T}}'
             +f'<{gap_pt_bins[ipt+1]} GeV, {eta_lo}<#eta<{eta_hi}')
         if (pt_bins[ipt]>70.0):
           is_high_pt.append(True)
@@ -576,44 +575,46 @@ def generate_jsons_plots_gap_lohipt(self, data_eff: list[float],
 
   num_bins_pt = len(pt_bins)-1
   num_bins_eta = len(eta_bins)-1
-  num_bins_ptgap = len(gap_pt_bins)
+  num_bins_ptgap = len(gap_pt_bins)-1
 
   for ipt in range(num_bins_pt+2):
     mean_bin_pt = 11.0
-    if (ipt > 0):
-      mean_bin_pt = (pt_bins[ipt-1]+pt_bins[ipt+1])/2.0
+    if ipt == (num_bins_pt+1):
+      mean_bin_pt = 300.0
+    elif (ipt > 0):
+      mean_bin_pt = (pt_bins[ipt-1]+pt_bins[ipt])/2.0
     for ieta in range(num_bins_eta+2):
       mean_bin_eta = (gapincl_eta_bins[ieta+1]+gapincl_eta_bins[ieta])/2.0
       tnp_bin = -1
       if ieta < neg_gap_idx:
         if ipt == 0:
           tnp_bin = 0
-        elif ipt == num_bins_pt:
+        elif ipt == (num_bins_pt+1):
           tnp_bin = 4+num_bins_pt*num_bins_eta+2*num_bins_ptgap+1
         else:
-          tnp_bin = 4+ipt*num_bins_eta+ieta
+          tnp_bin = 4+(ipt-1)*num_bins_eta+ieta
       elif ieta == neg_gap_idx:
         tnp_bin = (4+num_bins_pt*num_bins_eta
                    +get_bin(mean_bin_pt, gap_pt_bins)*2)
       elif ieta > neg_gap_idx and ieta < pos_gap_idx:
         if ipt == 0 and mean_bin_eta < 0:
           tnp_bin = 1
-        elif ipt == 0 and mean_bin_eta < 0:
+        elif ipt == 0 and mean_bin_eta > 0:
           tnp_bin = 2
-        elif ipt == num_bins_pt:
+        elif ipt == (num_bins_pt+1):
           tnp_bin = 4+num_bins_pt*num_bins_eta+2*num_bins_ptgap
         else:
-          tnp_bin = 4+ipt*num_bins_eta+(ieta-1)
+          tnp_bin = 4+(ipt-1)*num_bins_eta+(ieta-1)
       elif ieta == pos_gap_idx:
         tnp_bin = (4+num_bins_pt*num_bins_eta
                    +get_bin(mean_bin_pt, gap_pt_bins)*2+1)
       elif ieta > pos_gap_idx:
         if ipt == 0:
           tnp_bin = 3
-        elif ipt == num_bins_pt:
+        elif ipt == (num_bins_pt+1):
           tnp_bin = 4+num_bins_pt*num_bins_eta+2*num_bins_ptgap+1
         else:
-          tnp_bin = 4+ipt*num_bins_eta+(ieta-2)
+          tnp_bin = 4+(ipt-1)*num_bins_eta+(ieta-2)
       pass_json_sfs.append(pass_sf[tnp_bin])
       pass_json_uns.append(pass_unc[tnp_bin])
       fail_json_sfs.append(fail_sf[tnp_bin])
@@ -622,18 +623,18 @@ def generate_jsons_plots_gap_lohipt(self, data_eff: list[float],
       json_dat_unc.append(data_unc[tnp_bin])
       json_sim_eff.append(mc_eff[tnp_bin])
       json_sim_unc.append(mc_unc[tnp_bin])
-  pteta_dateff = transpose_onedim(json_dat_eff, num_bins_pt+1, 
-                                  num_bins_eta+2)
-  pteta_simeff = transpose_onedim(json_sim_eff, num_bins_pt+1, 
-                                  num_bins_eta+2)
-  pteta_sfpass = transpose_onedim(pass_json_sfs, num_bins_pt+1, 
-                                  num_bins_eta+2)
-  pteta_sffail = transpose_onedim(fail_json_sfs, num_bins_pt+1, 
-                                  num_bins_eta+2)
-  pteta_unpass = transpose_onedim(pass_json_uns, num_bins_pt+1, 
-                                  num_bins_eta+2)
-  pteta_unfail = transpose_onedim(fail_json_uns, num_bins_pt+1, 
-                                  num_bins_eta+2)
+  pteta_dateff = onedim_to_twodim(transpose_onedim(json_dat_eff, num_bins_pt+2, 
+      num_bins_eta+2), num_bins_pt+2, num_bins_eta+2)
+  pteta_simeff = onedim_to_twodim(transpose_onedim(json_sim_eff, num_bins_pt+2, 
+      num_bins_eta+2), num_bins_pt+2, num_bins_eta+2)
+  pteta_sfpass = onedim_to_twodim(transpose_onedim(pass_json_sfs, 
+      num_bins_pt+2, num_bins_eta+2), num_bins_pt+2, num_bins_eta+2)
+  pteta_sffail = onedim_to_twodim(transpose_onedim(fail_json_sfs, 
+      num_bins_pt+2, num_bins_eta+2), num_bins_pt+2, num_bins_eta+2)
+  pteta_unpass = onedim_to_twodim(transpose_onedim(pass_json_uns, 
+      num_bins_pt+2, num_bins_eta+2), num_bins_pt+2, num_bins_eta+2)
+  pteta_unfail = onedim_to_twodim(transpose_onedim(fail_json_uns, 
+      num_bins_pt+2, num_bins_eta+2), num_bins_pt+2, num_bins_eta+2)
 
   #get info for pt-binned plots
   lopt_eta_bins = [-2.5,-1.5,0.0,1.5,2.5]
@@ -657,10 +658,10 @@ def generate_jsons_plots_gap_lohipt(self, data_eff: list[float],
     ptplot_dateff[1].append([data_unc[tnp_bin]])
     ptplot_simeff[0].append([mc_eff[tnp_bin]])
     ptplot_simeff[1].append([mc_unc[tnp_bin]])
-    ptplot_passsf[0].append([pass_sf[tnp_bin]])
-    ptplot_passsf[1].append([pass_unc[tnp_bin]])
-    ptplot_failsf[0].append([fail_sf[tnp_bin]])
-    ptplot_failsf[1].append([fail_unc[tnp_bin]])
+    ptplot_sfpass[0].append([pass_sf[tnp_bin]])
+    ptplot_sfpass[1].append([pass_unc[tnp_bin]])
+    ptplot_sffail[0].append([fail_sf[tnp_bin]])
+    ptplot_sffail[1].append([fail_unc[tnp_bin]])
   for ieta in range(num_bins_eta):
     eta_lo = eta_bins[ieta]
     eta_hi = eta_bins[ieta+1]
@@ -679,24 +680,24 @@ def generate_jsons_plots_gap_lohipt(self, data_eff: list[float],
     ptplot_dateff[1].append([])
     ptplot_simeff[0].append([])
     ptplot_simeff[1].append([])
-    ptplot_passsf[0].append([])
-    ptplot_passsf[1].append([])
-    ptplot_failsf[0].append([])
-    ptplot_failsf[1].append([])
+    ptplot_sfpass[0].append([])
+    ptplot_sfpass[1].append([])
+    ptplot_sffail[0].append([])
+    ptplot_sffail[1].append([])
     for ipt in range(num_bins_pt):
       tnp_bin = 4+ipt*num_bins_eta+ieta
       pt_mean = (pt_bins[ipt+1]+pt_bins[ipt])/2.0
       pt_diff = (pt_bins[ipt+1]-pt_bins[ipt])/2.0
-      ptplot_x[0][ieta].append(pt_mean)
-      ptplot_x[1][ieta].append(pt_diff)
-      ptplot_dateff[0][ieta].append(data_eff[tnp_bin])
-      ptplot_dateff[1][ieta].append(data_unc[tnp_bin])
-      ptplot_simeff[0][ieta].append(mc_eff[tnp_bin])
-      ptplot_simeff[1][ieta].append(mc_unc[tnp_bin])
-      ptplot_passsf[0][ieta].append(pass_sf[tnp_bin])
-      ptplot_passsf[1][ieta].append(pass_unc[tnp_bin])
-      ptplot_failsf[0][ieta].append(fail_sf[tnp_bin])
-      ptplot_failsf[1][ieta].append(fail_unc[tnp_bin])
+      ptplot_x[0][-1].append(pt_mean)
+      ptplot_x[1][-1].append(pt_diff)
+      ptplot_dateff[0][-1].append(data_eff[tnp_bin])
+      ptplot_dateff[1][-1].append(data_unc[tnp_bin])
+      ptplot_simeff[0][-1].append(mc_eff[tnp_bin])
+      ptplot_simeff[1][-1].append(mc_unc[tnp_bin])
+      ptplot_sfpass[0][-1].append(pass_sf[tnp_bin])
+      ptplot_sfpass[1][-1].append(pass_unc[tnp_bin])
+      ptplot_sffail[0][-1].append(fail_sf[tnp_bin])
+      ptplot_sffail[1][-1].append(fail_unc[tnp_bin])
   eta_gap_lo = [-1.566, 1.4442]
   eta_gap_hi = [-1.4442, 1.566]
   for ieta in range(2):
@@ -707,24 +708,24 @@ def generate_jsons_plots_gap_lohipt(self, data_eff: list[float],
     ptplot_dateff[1].append([])
     ptplot_simeff[0].append([])
     ptplot_simeff[1].append([])
-    ptplot_passsf[0].append([])
-    ptplot_passsf[1].append([])
-    ptplot_failsf[0].append([])
-    ptplot_failsf[1].append([])
+    ptplot_sfpass[0].append([])
+    ptplot_sfpass[1].append([])
+    ptplot_sffail[0].append([])
+    ptplot_sffail[1].append([])
     for ipt in range(num_bins_ptgap):
       tnp_bin = 4+num_bins_pt*num_bins_eta+ipt*2+ieta
       pt_mean = (gap_pt_bins[ipt+1]+gap_pt_bins[ipt])/2.0
       pt_diff = (gap_pt_bins[ipt+1]-gap_pt_bins[ipt])/2.0
-      ptplot_x[0][ieta].append(pt_mean)
-      ptplot_x[1][ieta].append(pt_diff)
-      ptplot_dateff[0][ieta].append(data_eff[tnp_bin])
-      ptplot_dateff[1][ieta].append(data_unc[tnp_bin])
-      ptplot_simeff[0][ieta].append(mc_eff[tnp_bin])
-      ptplot_simeff[1][ieta].append(mc_unc[tnp_bin])
-      ptplot_passsf[0][ieta].append(pass_sf[tnp_bin])
-      ptplot_passsf[1][ieta].append(pass_unc[tnp_bin])
-      ptplot_failsf[0][ieta].append(fail_sf[tnp_bin])
-      ptplot_failsf[1][ieta].append(fail_unc[tnp_bin])
+      ptplot_x[0][-1].append(pt_mean)
+      ptplot_x[1][-1].append(pt_diff)
+      ptplot_dateff[0][-1].append(data_eff[tnp_bin])
+      ptplot_dateff[1][-1].append(data_unc[tnp_bin])
+      ptplot_simeff[0][-1].append(mc_eff[tnp_bin])
+      ptplot_simeff[1][-1].append(mc_unc[tnp_bin])
+      ptplot_sfpass[0][-1].append(pass_sf[tnp_bin])
+      ptplot_sfpass[1][-1].append(pass_unc[tnp_bin])
+      ptplot_sffail[0][-1].append(fail_sf[tnp_bin])
+      ptplot_sffail[1][-1].append(fail_unc[tnp_bin])
   highpt_eta_names = ['|#eta|<1.4442', '|#eta|>1.566']
   for ieta in range(2):
     ptplot_names.append(highpt_eta_names[ieta])
@@ -737,10 +738,13 @@ def generate_jsons_plots_gap_lohipt(self, data_eff: list[float],
     ptplot_dateff[1].append([data_unc[tnp_bin]])
     ptplot_simeff[0].append([mc_eff[tnp_bin]])
     ptplot_simeff[1].append([mc_unc[tnp_bin]])
-    ptplot_passsf[0].append([pass_sf[tnp_bin]])
-    ptplot_passsf[1].append([pass_unc[tnp_bin]])
-    ptplot_failsf[0].append([fail_sf[tnp_bin]])
-    ptplot_failsf[1].append([fail_unc[tnp_bin]])
+    ptplot_sfpass[0].append([pass_sf[tnp_bin]])
+    ptplot_sfpass[1].append([pass_unc[tnp_bin]])
+    ptplot_sffail[0].append([fail_sf[tnp_bin]])
+    ptplot_sffail[1].append([fail_unc[tnp_bin]])
+ 
+  print(ptplot_x[0])
+  print(ptplot_x[1])
 
   #get info for eta-binned plots
   etaplot_names.append('7<p_{T}<15 GeV')
@@ -750,24 +754,24 @@ def generate_jsons_plots_gap_lohipt(self, data_eff: list[float],
   etaplot_dateff[1].append([data_unc[tnp_bin] for tnp_bin in range(4)])
   etaplot_simeff[0].append([mc_eff[tnp_bin] for tnp_bin in range(4)])
   etaplot_simeff[1].append([mc_unc[tnp_bin] for tnp_bin in range(4)])
-  etaplot_passsf[0].append([pass_sf[tnp_bin] for tnp_bin in range(4)])
-  etaplot_passsf[1].append([pass_unc[tnp_bin] for tnp_bin in range(4)])
-  etaplot_failsf[0].append([fail_sf[tnp_bin] for tnp_bin in range(4)])
-  etaplot_failsf[1].append([fail_unc[tnp_bin] for tnp_bin in range(4)])
+  etaplot_sfpass[0].append([pass_sf[tnp_bin] for tnp_bin in range(4)])
+  etaplot_sfpass[1].append([pass_unc[tnp_bin] for tnp_bin in range(4)])
+  etaplot_sffail[0].append([fail_sf[tnp_bin] for tnp_bin in range(4)])
+  etaplot_sffail[1].append([fail_unc[tnp_bin] for tnp_bin in range(4)])
   for ipt in range(num_bins_pt):
     pt_lo = pt_bins[ipt]
     pt_hi = pt_bins[ipt+1]
-    etaplot_names.append(f'{pt_lo}<#pt<{pt_hi} GeV')
+    etaplot_names.append(f'{pt_lo}<p_{{T}}<{pt_hi} GeV')
     etaplot_x[0].append([])
     etaplot_x[1].append([])
     etaplot_dateff[0].append([])
     etaplot_dateff[1].append([])
     etaplot_simeff[0].append([])
     etaplot_simeff[1].append([])
-    etaplot_passsf[0].append([])
-    etaplot_passsf[1].append([])
-    etaplot_failsf[0].append([])
-    etaplot_failsf[1].append([])
+    etaplot_sfpass[0].append([])
+    etaplot_sfpass[1].append([])
+    etaplot_sffail[0].append([])
+    etaplot_sffail[1].append([])
     for ieta in range(num_bins_eta):
       tnp_bin = 4+ipt*num_bins_eta+ieta
       eta_lo = eta_bins[ieta]
@@ -782,42 +786,42 @@ def generate_jsons_plots_gap_lohipt(self, data_eff: list[float],
         eta_hi = 1.4442
       eta_mean = (eta_hi+eta_lo)/2.0
       eta_diff = (eta_hi-eta_lo)/2.0
-      etaplot_x[0][ipt].append(eta_mean)
-      etaplot_x[1][ipt].append(eta_diff)
-      etaplot_dateff[0][ipt].append(data_eff[tnp_bin])
-      etaplot_dateff[1][ipt].append(data_unc[tnp_bin])
-      etaplot_simeff[0][ipt].append(mc_eff[tnp_bin])
-      etaplot_simeff[1][ipt].append(mc_unc[tnp_bin])
-      etaplot_passsf[0][ipt].append(pass_sf[tnp_bin])
-      etaplot_passsf[1][ipt].append(pass_unc[tnp_bin])
-      etaplot_failsf[0][ipt].append(fail_sf[tnp_bin])
-      etaplot_failsf[1][ipt].append(fail_unc[tnp_bin])
+      etaplot_x[0][-1].append(eta_mean)
+      etaplot_x[1][-1].append(eta_diff)
+      etaplot_dateff[0][-1].append(data_eff[tnp_bin])
+      etaplot_dateff[1][-1].append(data_unc[tnp_bin])
+      etaplot_simeff[0][-1].append(mc_eff[tnp_bin])
+      etaplot_simeff[1][-1].append(mc_unc[tnp_bin])
+      etaplot_sfpass[0][-1].append(pass_sf[tnp_bin])
+      etaplot_sfpass[1][-1].append(pass_unc[tnp_bin])
+      etaplot_sffail[0][-1].append(fail_sf[tnp_bin])
+      etaplot_sffail[1][-1].append(fail_unc[tnp_bin])
   for ipt in range(num_bins_ptgap):
-    etaplot_names.append(f'{gap_pt_bins[ipt]}<p_{T}<{gap_pt_bins[ipt+1]} GeV')
+    etaplot_names.append(f'{gap_pt_bins[ipt]}<p_{{T}}<{gap_pt_bins[ipt+1]} GeV')
     etaplot_x[0].append([])
     etaplot_x[1].append([])
     etaplot_dateff[0].append([])
     etaplot_dateff[1].append([])
     etaplot_simeff[0].append([])
     etaplot_simeff[1].append([])
-    etaplot_passsf[0].append([])
-    etaplot_passsf[1].append([])
-    etaplot_failsf[0].append([])
-    etaplot_failsf[1].append([])
+    etaplot_sfpass[0].append([])
+    etaplot_sfpass[1].append([])
+    etaplot_sffail[0].append([])
+    etaplot_sffail[1].append([])
     for ieta in range(2):
       tnp_bin = 4+num_bins_eta*num_bins_pt+ipt*2+ieta
-      eta_mean = (gap_gap_hi[ieta]+eta_gap_lo[ieta])/2.0
-      eta_diff = (gap_gap_hi[ieta]-eta_gap_lo[ieta])/2.0
-      etaplot_x[0][ipt].append(eta_mean)
-      etaplot_x[1][ipt].append(eta_diff)
-      etaplot_dateff[0][ipt].append(data_eff[tnp_bin])
-      etaplot_dateff[1][ipt].append(data_unc[tnp_bin])
-      etaplot_simeff[0][ipt].append(mc_eff[tnp_bin])
-      etaplot_simeff[1][ipt].append(mc_unc[tnp_bin])
-      etaplot_passsf[0][ipt].append(pass_sf[tnp_bin])
-      etaplot_passsf[1][ipt].append(pass_unc[tnp_bin])
-      etaplot_failsf[0][ipt].append(fail_sf[tnp_bin])
-      etaplot_failsf[1][ipt].append(fail_unc[tnp_bin])
+      eta_mean = (eta_gap_hi[ieta]+eta_gap_lo[ieta])/2.0
+      eta_diff = (eta_gap_hi[ieta]-eta_gap_lo[ieta])/2.0
+      etaplot_x[0][-1].append(eta_mean)
+      etaplot_x[1][-1].append(eta_diff)
+      etaplot_dateff[0][-1].append(data_eff[tnp_bin])
+      etaplot_dateff[1][-1].append(data_unc[tnp_bin])
+      etaplot_simeff[0][-1].append(mc_eff[tnp_bin])
+      etaplot_simeff[1][-1].append(mc_unc[tnp_bin])
+      etaplot_sfpass[0][-1].append(pass_sf[tnp_bin])
+      etaplot_sfpass[1][-1].append(pass_unc[tnp_bin])
+      etaplot_sffail[0][-1].append(fail_sf[tnp_bin])
+      etaplot_sffail[1][-1].append(fail_unc[tnp_bin])
   etaplot_names.append('100<p_{T}<500 GeV')
   tnp_bin = 4+num_bins_eta*num_bins_pt+num_bins_ptgap*2
   etaplot_x[0].append([-2.033, 0.0, 2.033])
@@ -830,13 +834,13 @@ def generate_jsons_plots_gap_lohipt(self, data_eff: list[float],
                             mc_eff[tnp_bin+1]])
   etaplot_simeff[1].append([mc_unc[tnp_bin+1], mc_unc[tnp_bin], 
                             mc_unc[tnp_bin+1]])
-  etaplot_passsf[0].append([pass_sf[tnp_bin+1], pass_sf[tnp_bin], 
+  etaplot_sfpass[0].append([pass_sf[tnp_bin+1], pass_sf[tnp_bin], 
                             pass_sf[tnp_bin+1]])
-  etaplot_passsf[1].append([pass_unc[tnp_bin+1], pass_unc[tnp_bin], 
+  etaplot_sfpass[1].append([pass_unc[tnp_bin+1], pass_unc[tnp_bin], 
                             pass_unc[tnp_bin+1]])
-  etaplot_failsf[0].append([fail_sf[tnp_bin+1], fail_sf[tnp_bin], 
+  etaplot_sffail[0].append([fail_sf[tnp_bin+1], fail_sf[tnp_bin], 
                             fail_sf[tnp_bin+1]])
-  etaplot_failsf[1].append([fail_unc[tnp_bin+1], fail_unc[tnp_bin], 
+  etaplot_sffail[1].append([fail_unc[tnp_bin+1], fail_unc[tnp_bin], 
                             fail_unc[tnp_bin+1]])
 
   if not os.path.isdir('out/'+name):
@@ -844,21 +848,22 @@ def generate_jsons_plots_gap_lohipt(self, data_eff: list[float],
     os.mkdir('out/'+name)
 
   #write JSON
-  clib_sfs_pass = make_correction('sf_pass', 'data-MC SF', pt_bins, 
+  aug_pt_bins = [7.0]+pt_bins+[500.0]
+  clib_sfs_pass = make_correction('sf_pass', 'data-MC SF', aug_pt_bins, 
                                   gapincl_eta_bins, pass_json_sfs)
-  clib_uns_pass = make_correction('unc_pass', 'data-MC unc', pt_bins, 
+  clib_uns_pass = make_correction('unc_pass', 'data-MC unc', aug_pt_bins, 
                                   gapincl_eta_bins, pass_json_uns)
-  clib_sfs_fail = make_correction('sf_fail', 'data-MC SF', pt_bins, 
+  clib_sfs_fail = make_correction('sf_fail', 'data-MC SF', aug_pt_bins, 
                                   gapincl_eta_bins, fail_json_sfs)
-  clib_uns_fail = make_correction('unc_fail', 'data-MC unc', pt_bins, 
+  clib_uns_fail = make_correction('unc_fail', 'data-MC unc', aug_pt_bins, 
                                   gapincl_eta_bins, fail_json_uns)
-  clib_dat_eff = make_correction('effdata', 'data eff', pt_bins, 
+  clib_dat_eff = make_correction('effdata', 'data eff', aug_pt_bins, 
                                  gapincl_eta_bins, json_dat_eff)
-  clib_dat_unc = make_correction('systdata', 'data unc', pt_bins, 
+  clib_dat_unc = make_correction('systdata', 'data unc', aug_pt_bins, 
                                  gapincl_eta_bins, json_dat_unc)
-  clib_sim_eff = make_correction('effmc', 'MC eff', pt_bins, 
+  clib_sim_eff = make_correction('effmc', 'MC eff', aug_pt_bins, 
                                  gapincl_eta_bins, json_sim_eff)
-  clib_sim_unc = make_correction('systmc', 'MC unc', pt_bins, 
+  clib_sim_unc = make_correction('systmc', 'MC unc', aug_pt_bins, 
                                  gapincl_eta_bins, json_sim_unc)
 
   sf_filename = 'out/{0}/{0}_scalefactors.json'.format(name)
@@ -887,12 +892,10 @@ def generate_jsons_plots_gap_lohipt(self, data_eff: list[float],
   ptplot_sim_names = [f'MC {name}' for name in ptplot_names]
   etaplot_dat_names = [f'Data {name}' for name in etaplot_names]
   etaplot_sim_names = [f'MC {name}' for name in etaplot_names]
+
   gc.collect()
   gc.disable()
-  file_extension = 'pdf'
-  if is_webversion:
-    file_extension = 'png'
-
+  aug_pt_bins = [7.0]+pt_bins+[500.0]
   for file_extension, web_tag in [('pdf',''),('png','web_')]:
     #2D plots
     for plot_data, plot_name, plot_desc in [
@@ -902,38 +905,38 @@ def generate_jsons_plots_gap_lohipt(self, data_eff: list[float],
         (pteta_sffail, '_sffail', failsf_string),
         (pteta_unpass, '_sfpass_unc', passun_string),
         (pteta_unfail, '_sffail_unc', failun_string)]:
-      make_heatmap(gapincl_eta_bins, pt_bins, pteta_dataeff, 
-                   f'out/{web_tag}{name}/{name}_eff_data.{file_extension}'
+      make_heatmap(gapincl_eta_bins, aug_pt_bins, plot_data, 
+                   f'out/{web_tag}{name}/{name}{plot_name}.{file_extension}',
                    '#eta', 'p_{T} [GeV]', 
-                   eff_string, LUMI_TAGS[year],False,True)
+                   plot_desc, LUMI_TAGS[year],False,True)
     #1D plots
     make_data_mc_graph_multibin(ptplot_x[0], ptplot_x[1], 
-        ptplot_dateff_y[0], ptplot_dateff_y[1], ptplot_simeff_y[0],
-        ptplot_simeff_y[1], 
+        ptplot_dateff[0], ptplot_dateff[1], ptplot_simeff[0],
+        ptplot_simeff[1], 
         f'out/{web_tag}{name}/{name}_eff_ptbinned.{file_extension}',
         ptplot_dat_names, ptplot_sim_names, 'p_{T} [GeV]', eff_string,
-        LUMI_TAGS[years], True)
+        LUMI_TAGS[year], True)
     make_data_mc_graph_multibin(etaplot_x[0], etaplot_x[1], 
-        etaplot_dateff_y[0], etaplot_dateff_y[1], etaplot_simeff_y[0],
-        etaplot_simeff_y[1], 
+        etaplot_dateff[0], etaplot_dateff[1], etaplot_simeff[0],
+        etaplot_simeff[1], 
         f'out/{web_tag}{name}/{name}_eff_etabinned.{file_extension}',
         etaplot_dat_names, etaplot_sim_names, '#eta', eff_string,
-        LUMI_TAGS[years], False)
+        LUMI_TAGS[year], False)
     make_sf_graph_multibin(ptplot_x[0], ptplot_x[1], 
-        ptplot_sfpass_y[0], ptplot_sfpass_y[1], 
+        ptplot_sfpass[0], ptplot_sfpass[1], 
         f'out/{web_tag}{name}/{name}_sfpass_ptbinned.{file_extension}',
-        ptplot_names, 'p_{T} [GeV]', passsf_string, LUMI_TAGS[years], True)
+        ptplot_names, 'p_{T} [GeV]', passsf_string, LUMI_TAGS[year], True)
     make_sf_graph_multibin(ptplot_x[0], ptplot_x[1], 
-        ptplot_sffail_y[0], ptplot_sffail_y[1], 
+        ptplot_sffail[0], ptplot_sffail[1], 
         f'out/{web_tag}{name}/{name}_sffail_ptbinned.{file_extension}',
-        ptplot_names, 'p_{T} [GeV]', failsf_string, LUMI_TAGS[years], True)
+        ptplot_names, 'p_{T} [GeV]', failsf_string, LUMI_TAGS[year], True)
     make_sf_graph_multibin(etaplot_x[0], etaplot_x[1], 
-        etaplot_sfpass_y[0], etaplot_sfpass_y[1], 
+        etaplot_sfpass[0], etaplot_sfpass[1], 
         f'out/{web_tag}{name}/{name}_sfpass_etabinned.{file_extension}',
-        etaplot_names, 'p_{T} [GeV]', passsf_string, LUMI_TAGS[years], False)
+        etaplot_names, '#eta', passsf_string, LUMI_TAGS[year], False)
     make_sf_graph_multibin(etaplot_x[0], etaplot_x[1], 
-        etaplot_sffail_y[0], etaplot_sffail_y[1], 
+        etaplot_sffail[0], etaplot_sffail[1], 
         f'out/{web_tag}{name}/{name}_sffail_etabinned.{file_extension}',
-        etaplot_names, 'p_{T} [GeV]', failsf_string, LUMI_TAGS[years], False)
+        etaplot_names, '#eta', failsf_string, LUMI_TAGS[year], False)
 
   gc.enable()

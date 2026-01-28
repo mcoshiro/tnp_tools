@@ -4,7 +4,6 @@ T&P meta analyzer that follows standard EGM procedures to generate scale factors
 """
 
 from array import array
-from correctionlib import schemav2 
 from functools import partial
 from collections.abc import Callable
 import gc
@@ -157,34 +156,6 @@ def get_mc_histogram(ibin: int, is_pass: bool, mc_analyzer: TnpAnalyzer,
   hist.SetDirectory(ROOT.nullptr)
   input_file.Close()
   return hist
-
-def add_gap_eta_bins(original_bins: list[float]) -> tuple[list[float],int,int]:
-  '''Modifies binning to include gap bins
-
-  Modifies eta binning to include EB-EE gap bins (-1.566,-1.4442) and 
-  (1.4442,1.566). Original_bins MUST include -1.5 and 1.5
-
-  Args:
-    original_bins: ordered bin edges
-
-  Returns: 
-    (new_bins, -gap_index, +gap_index)
-  '''
-  new_bins = original_bins.copy()
-  neg_gap_location = -1
-  pos_gap_location = -1
-  for i in range(len(original_bins)-1):
-    if new_bins[i]>-1.566 and new_bins[i]<-1.4442:
-      neg_gap_location = i
-    if new_bins[i]>1.4442 and new_bins[i]<1.566:
-      pos_gap_location = i
-  if neg_gap_location==-1 or pos_gap_location==-1:
-    raise ValueError('Input binning must have borders in gap region.')
-  new_bins.insert(neg_gap_location,-1.566)
-  new_bins[neg_gap_location+1] = -1.4442
-  new_bins.insert(pos_gap_location+1,1.4442)
-  new_bins[pos_gap_location+2] = 1.566
-  return (new_bins, neg_gap_location, pos_gap_location+1)
 
 def calculate_sfs(eff_dat1: float, eff_dat2: float, eff_dat3: float, 
                   eff_dat4: float, eff_sim1: float, eff_sim2: float, 
@@ -358,33 +329,6 @@ def make_data_mc_graph(x: list[float], ex: list[float],
   sf_plot.y_title = y_title
   sf_plot.log_x = log_x
   sf_plot.draw(name)
-
-def make_correction(name: str, desc: str, pt_bins: list[float], 
-                    eta_bins: list[float], 
-                    content: list[float]) -> schemav2.Correction:
-  '''Generates correctionlib correction object
-
-  Args:
-    name: correction name
-    desc: description
-    pt_bins: bin edges
-    eta_bins: bin edges
-    content: content
-  '''
-  return schemav2.Correction(
-      name=name,
-      version=1,
-      inputs=[schemav2.Variable(name='pt', type='real', description='pt'),
-              schemav2.Variable(name='eta', type='real', description='eta')],
-      output=schemav2.Variable(name='sf', type='real', description=desc),
-      data=schemav2.MultiBinning(
-          nodetype='multibinning',
-          inputs=['pt','eta'],
-          edges=[pt_bins, eta_bins],
-          content=content,
-          flow='clamp',
-          ),
-      )
 
 def make_sf_graph(x: list[float], ex: list[float], y: list[list[float]], 
                   ey: list[list[float]], name: str, graph_names: list[str], 
@@ -919,6 +863,7 @@ class RmsSFAnalyzer:
     '''
 
     #generate plots
+    webdir = 'out/web_{0}'.format(self.name)
     self.data_nom_tnp_analyzer.generate_web_output(webdir)
     self.data_altsig_tnp_analyzer.generate_web_output(webdir)
     self.data_altbkg_tnp_analyzer.generate_web_output(webdir)
@@ -964,9 +909,9 @@ class RmsSFAnalyzer:
     #checks
     if not self.generate_individual_outputs(cnc):
       return
-    if os.path.isdir('out/web_{0}'.format(self.name)):
-      print('ERROR: web output already exists, aborting')
-      return
+    #if os.path.isdir('out/web_{0}'.format(self.name)):
+    #  print('ERROR: web output already exists, aborting')
+    #  return
 
     #get efficiencies from JSON files
     nomdat_name = self.name+'_data_nom'
@@ -1038,11 +983,12 @@ class RmsSFAnalyzer:
       fail_sf.append(sfs[2])
       fail_unc.append(sfs[3])
 
-    webdir = 'out/web_{0}'.format(self.name)
-    os.mkdir(webdir)
+    #webdir = 'out/web_{0}'.format(self.name)
+    #os.mkdir(webdir)
     desc = self.data_nom_tnp_analyzer.measurement_desc
     self.generate_json_plot_callback(self, data_eff, data_unc, mc_eff, 
-        mc_unc, pass_sf, pass_unc, fail_sf, fail_unc, name, desc, self.year)
+        mc_unc, pass_sf, pass_unc, fail_sf, fail_unc, self.name, desc, 
+        self.year)
     self.generate_web_output()
 
   def generate_jsons_summary_plots_nogap(data_eff: list[float], 
@@ -1827,7 +1773,6 @@ class RmsSFAnalyzer:
         print('                               altb,altsb,mc) use bin and pass(=p/f) to ')
         print('                               start from a particular bin and category')
         print('o(utput) [cnc]                 generate final outputs optionally with cut&count')
-        print('w(eboutput)                    generate web output')
         print('c(lean)                        cleans previous output')
         print('q(uit)                         exit')
         print('(pre)v(ious)                   list previous commands entered')
@@ -1886,7 +1831,7 @@ class RmsSFAnalyzer:
           if (user_input[1] == 'cnc'):
             do_cnc = True
         #TODO add calls to outputs for each individual piece
-        self.generate_output(False, do_cnc)
+        self.generate_output(do_cnc)
       elif (user_input[0] == 'q' or user_input[0] == 'quit'):
         exit_loop = True
       elif (user_input[0] == 'c' or user_input[0] == 'clean'):

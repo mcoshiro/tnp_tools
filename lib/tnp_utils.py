@@ -4,6 +4,8 @@ Package containing utilities for tag-and-probe analyses
 
 from array import array
 from math import sqrt
+from correctionlib import schemav2 
+from root_plot_lib import RplPlot
 import json
 import ROOT
 
@@ -40,7 +42,11 @@ CMS_COLORS = [ROOT.TColor.GetColor('#3f90da'),
               ROOT.TColor.GetColor('#717581'), 
               ROOT.TColor.GetColor('#92dadd'), #last official color
               ROOT.TColor.GetColor('#964a8b'),
-              ROOT.TColor.GetColor('#e42536')]
+              ROOT.TColor.GetColor('#e42536'),
+              ROOT.TColor.GetColor('#458747'),
+              ROOT.TColor.GetColor('#2e2e87'),
+              ROOT.TColor.GetColor('#bd628d'),
+              ROOT.TColor.GetColor('#404040')]
 
 def clean_string(name):
   '''
@@ -320,14 +326,40 @@ def transpose_onedim(arr: list, x_length: int, y_length: int):
   '''Given a 1d array containing 2D information with the index convention 
   y+x*y_length returns a 1d array with the same information but index 
   convention x+y*x_length
+
+  Args:
+    arr: list to transpose
+    x_length: x length of initial list
+    y_length: y length of initial list
+
+  Returns:
+    transposed list
   '''
   if (len(arr) != x_length*y_length):
     raise ValueError(
         'Cannot transpose array whose size is not x_length*y_length.')
+  ret = []
   for iy in range(y_length):
     for ix in range(x_length):
       ret.append(arr[iy+ix*y_length])
+  return ret
+
+def onedim_to_twodim(arr: list, x_length: int, y_length: int):
+  '''Converts a one dimensional list to a two dimensional one
+
+  Args:
+    arr: 1d transpose
+    x_length: x length of initial list
+    y_length: y length of initial list
+
+  Returns:
+    2d list
+  '''
   ret = []
+  for iy in range(y_length):
+    ret.append([])
+    for ix in range(x_length):
+      ret[iy].append(arr[iy*x_length+ix])
   return ret
 
 def make_sf_graph_multibin(x: list[list[float]], ex: list[list[float]], 
@@ -359,8 +391,8 @@ def make_sf_graph_multibin(x: list[list[float]], ex: list[list[float]],
     ex_vals.append(array('d',ex[idata]))
     y_vals.append(array('d',y[idata]))
     ey_vals.append(array('d',ey[idata]))
-    graphs.append(ROOT.TGraphErrors(len(x),x_vals,y_vals[idata],
-                                    ex_vals,ey_vals[idata]))
+    graphs.append(ROOT.TGraphErrors(len(x[idata]),x_vals[idata],y_vals[idata],
+                                    ex_vals[idata],ey_vals[idata]))
     graphs[-1].SetTitle(graph_names[idata])
     graphs[-1].SetLineColor(CMS_COLORS[idata])
   sf_plot = RplPlot()
@@ -407,19 +439,19 @@ def make_data_mc_graph_multibin(x: list[list[float]], ex: list[list[float]],
   sim_ey_vals = []
   graphs = []
   for ibin in range(len(data_y)):
-    x_vals.append(array('d',x))
-    ex_vals.append(array('d',ex))
+    x_vals.append(array('d',x[ibin]))
+    ex_vals.append(array('d',ex[ibin]))
     data_y_vals.append(array('d',data_y[ibin]))
     data_ey_vals.append(array('d',data_ey[ibin]))
     sim_y_vals.append(array('d',sim_y[ibin]))
     sim_ey_vals.append(array('d',sim_ey[ibin]))
-    graphs.append(ROOT.TGraphErrors(len(x),x_vals[ibin],data_y_vals[ibin],
-                                    ex_vals[ibin],data_ey_vals[ibin]))
+    graphs.append(ROOT.TGraphErrors(len(x[ibin]), x_vals[ibin],
+        data_y_vals[ibin], ex_vals[ibin], data_ey_vals[ibin]))
     graphs[-1].SetTitle(data_names[ibin])
     graphs[-1].SetLineStyle(ROOT.kSolid)
     graphs[-1].SetLineColor(CMS_COLORS[ibin])
-    graphs.append(ROOT.TGraphErrors(len(x),x_vals[ibin],sim_y_vals[ibin],
-                                    ex_vals[ibin],sim_ey_vals[ibin]))
+    graphs.append(ROOT.TGraphErrors(len(x[ibin]), x_vals[ibin],
+        sim_y_vals[ibin], ex_vals[ibin], sim_ey_vals[ibin]))
     graphs[-1].SetTitle(mc_names[ibin])
     graphs[-1].SetLineStyle(ROOT.kDashed)
     graphs[-1].SetLineColor(CMS_COLORS[ibin])
@@ -431,4 +463,59 @@ def make_data_mc_graph_multibin(x: list[list[float]], ex: list[list[float]],
   sf_plot.y_title = y_title
   sf_plot.log_x = log_x
   sf_plot.draw(name)
+
+def add_gap_eta_bins(original_bins: list[float]) -> tuple[list[float],int,int]:
+  '''Modifies binning to include gap bins
+
+  Modifies eta binning to include EB-EE gap bins (-1.566,-1.4442) and 
+  (1.4442,1.566). Original_bins MUST include -1.5 and 1.5
+
+  Args:
+    original_bins: ordered bin edges
+
+  Returns: 
+    (new_bins, -gap_index, +gap_index)
+  '''
+  new_bins = original_bins.copy()
+  neg_gap_location = -1
+  pos_gap_location = -1
+  for i in range(len(original_bins)-1):
+    if new_bins[i]>-1.566 and new_bins[i]<-1.4442:
+      neg_gap_location = i
+    if new_bins[i]>1.4442 and new_bins[i]<1.566:
+      pos_gap_location = i
+  if neg_gap_location==-1 or pos_gap_location==-1:
+    raise ValueError('Input binning must have borders in gap region.')
+  new_bins.insert(neg_gap_location,-1.566)
+  new_bins[neg_gap_location+1] = -1.4442
+  new_bins.insert(pos_gap_location+1,1.4442)
+  new_bins[pos_gap_location+2] = 1.566
+  return (new_bins, neg_gap_location, pos_gap_location+1)
+
+def make_correction(name: str, desc: str, pt_bins: list[float], 
+                    eta_bins: list[float], 
+                    content: list[float]) -> schemav2.Correction:
+  '''Generates correctionlib correction object
+
+  Args:
+    name: correction name
+    desc: description
+    pt_bins: bin edges
+    eta_bins: bin edges
+    content: content
+  '''
+  return schemav2.Correction(
+      name=name,
+      version=1,
+      inputs=[schemav2.Variable(name='pt', type='real', description='pt'),
+              schemav2.Variable(name='eta', type='real', description='eta')],
+      output=schemav2.Variable(name='sf', type='real', description=desc),
+      data=schemav2.MultiBinning(
+          nodetype='multibinning',
+          inputs=['pt','eta'],
+          edges=[pt_bins, eta_bins],
+          content=content,
+          flow='clamp',
+          ),
+      )
 

@@ -119,7 +119,7 @@ if __name__=='__main__':
   elid_analyzer.set_preselection(preselection,preselection_mc,preselection)
   if (year != '2023BPixHole'):
     add_standard_gap_lohipt_binning(elid_analyzer, 
-        [7.0,15.0,20.0,35.0,50.0,100.0],
+        [15.0,20.0,35.0,50.0,100.0],
         [-2.5,-2.0,-1.5,-0.8,0.0,0.8,1.5,2.0,2.5],[7.0,35.0,500.0],'el_pt',
         'el_sc_eta')
   else:

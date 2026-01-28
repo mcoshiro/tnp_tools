@@ -463,7 +463,10 @@ class RplPlot:
     if not self.is_2d:
       dummy_hist_upper.Draw()
       if (self.legend_ncolumns == -1):
-        self.legend_ncolumns = self.n_plots//4+1
+        if self.n_plots < 16:
+          self.legend_ncolumns = self.n_plots//4+1
+        else:
+          self.legend_ncolumns = self.n_plots//6+1
       if (not self.legend_customsize):
         if (self.n_plots < self.legend_ncolumns*4):
           self.legend_ylo = 0.9-0.03*(self.n_plots//self.legend_ncolumns+1)
@@ -476,6 +479,8 @@ class RplPlot:
       leg.SetNColumns(n_columns)
       if (n_columns > 2):
         leg.SetTextSize(0.015)
+      if (n_columns > 4):
+        leg.SetTextSize(0.01)
       color_index = 0
       for hist, color, style in zip(self.hists, self.hist_color, self.hist_style):
         hist.SetLineWidth(3)
