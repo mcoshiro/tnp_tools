@@ -135,7 +135,9 @@ def generate_jsons_plots_gap_highpt(self, data_eff: list[float],
   num_bins_ptgap = len(gap_pt_bins)-1
 
   for ipt in range(num_bins_pt+1):
-    mean_bin_pt = (pt_bins[ipt]+pt_bins[ipt+1])/2.0
+    mean_bin_pt = 300.0
+    if ipt < num_bins_pt:
+      mean_bin_pt = (pt_bins[ipt]+pt_bins[ipt+1])/2.0
     for ieta in range(num_bins_eta+2):
       tnp_bin = -1
       if ieta < neg_gap_idx:
@@ -400,6 +402,7 @@ def generate_jsons_plots_gap_highpt(self, data_eff: list[float],
 
   gc.collect()
   gc.disable()
+  aug_pt_bins = pt_bins+[500.0]
   for file_extension, web_tag in [('pdf',''),('png','web_')]:
     #2D plots
     for plot_data, plot_name, plot_desc in [
@@ -409,8 +412,8 @@ def generate_jsons_plots_gap_highpt(self, data_eff: list[float],
         (pteta_sffail, '_sffail', failsf_string),
         (pteta_unpass, '_sfpass_unc', passun_string),
         (pteta_unfail, '_sffail_unc', failun_string)]:
-      make_heatmap(gapincl_eta_bins, pt_bins, pteta_dataeff, 
-                   f'out/{web_tag}{name}/{name}_{plot_name}.{file_extension}',
+      make_heatmap(gapincl_eta_bins, aug_pt_bins, plot_data, 
+                   f'out/{web_tag}{name}/{name}{plot_name}.{file_extension}',
                    '#eta', 'p_{T} [GeV]', 
                    plot_desc, LUMI_TAGS[year],False,True)
     #1D plots

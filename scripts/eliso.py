@@ -4,6 +4,7 @@
 #  and OR of single and dielectron triggers
 
 from rms_sf_analyzer import RmsSFAnalyzer
+from bin_utils import add_standard_gap_highpt_binning
 from argparse import ArgumentParser
 
 if __name__=='__main__':
@@ -33,7 +34,7 @@ if __name__=='__main__':
   measurement_cut = 'probe_el_miniso<'+args.cut
   measurement_desc = 'I_{mini}<'+args.cut
   preselection = '1'
-  pt_binning = [7.0,15.0,20.0,35.0,50.0,100.0,500.0]
+  pt_binning = [7.0,15.0,20.0,35.0,50.0,100.0]
   eta_binning = [-2.5,-2.0,-1.5,-0.8,0.0,0.8,1.5,2.0,2.5]
   gap_pt_binning = [7.0,35.0,500.0]
   if args.year=='2023BPix':
@@ -55,9 +56,8 @@ if __name__=='__main__':
   eliso_analyzer.set_measurement_variable(measurement_cut,measurement_desc)
   eliso_analyzer.set_preselection(preselection,preselection,preselection)
   if (args.year != '2023BPixHole'):
-    eliso_analyzer.add_standard_gap_binning(pt_binning,eta_binning,
-                                            gap_pt_binning,
-                                            'probe_el_pt','probe_el_eta')
+    add_standard_gap_highpt_binning(eliso_analyzer, pt_binning,
+        eta_binning, gap_pt_binning, 'probe_el_pt', 'probe_el_eta')
   else:
     eliso_analyzer.add_standard_binning([7.0,20.0,35.0,50.0,500.0],
                                         [-1.566,-1.4442,-0.8,0.0],

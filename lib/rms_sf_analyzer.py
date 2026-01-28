@@ -909,9 +909,10 @@ class RmsSFAnalyzer:
     #checks
     if not self.generate_individual_outputs(cnc):
       return
-    #if os.path.isdir('out/web_{0}'.format(self.name)):
-    #  print('ERROR: web output already exists, aborting')
-    #  return
+
+    webdir = 'out/web_{0}'.format(self.name)
+    if not os.path.isdir(webdir):
+      os.mkdir(webdir)
 
     #get efficiencies from JSON files
     nomdat_name = self.name+'_data_nom'
@@ -983,8 +984,6 @@ class RmsSFAnalyzer:
       fail_sf.append(sfs[2])
       fail_unc.append(sfs[3])
 
-    #webdir = 'out/web_{0}'.format(self.name)
-    #os.mkdir(webdir)
     desc = self.data_nom_tnp_analyzer.measurement_desc
     self.generate_json_plot_callback(self, data_eff, data_unc, mc_eff, 
         mc_unc, pass_sf, pass_unc, fail_sf, fail_unc, self.name, desc, 
